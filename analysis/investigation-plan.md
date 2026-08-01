@@ -24,8 +24,8 @@ The investigation aims to recover architectural intent and important data struct
 | Phase | Status | Outcome |
 |---|---|---|
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
-| 2. Lightweight static map | Ready for review | Separate runtime from game code and create an initial function ledger |
-| 3. Controlled DOSBox-X runs | Not started | Correlate small behavioral experiments with code addresses |
+| 2. Lightweight static map | Complete; awaiting review | Static architecture and function ledger recorded in `static-map.md` and `function-ledger.csv` |
+| 3. Controlled DOSBox-X runs | Ready for review | Correlate small behavioral experiments with code addresses |
 | 4. Ghidra analysis | Not started | Recover functions, call relationships, structures, and pseudocode |
 | 5. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -75,11 +75,11 @@ Proposed native tools: DOSBox-X, radare2, and NASM/ndisasm. Show and review the 
 
 ### Tasks
 
-- Cross-check the entry point and memory mappings.
-- Disassemble from the entry point and locate startup/runtime boundaries.
-- Inventory DOS/BIOS interrupts, port I/O, video-memory references, far calls, indirect calls, and jump tables.
-- Create a function ledger with address, proposed name, evidence, and confidence.
-- Identify candidates for initialization, shutdown, main loop, input, timing, rendering, sound, random-number generation, entity updates, and collision logic.
+- [x] Cross-check the entry point and memory mappings.
+- [x] Disassemble from the entry point and locate startup/runtime boundaries.
+- [x] Inventory DOS/BIOS interrupts, port I/O, video-memory references, far calls, indirect calls, and jump tables.
+- [x] Create a function ledger with address, proposed name, evidence, and confidence.
+- [x] Identify candidates for initialization, shutdown, main loop, input, timing, rendering, sound, random-number generation, entity updates, and collision logic.
 
 ### Outputs
 
@@ -148,3 +148,9 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Changed the inventory generator so published reports contain only repository-relative paths and do not record the host name.
 - Added public-repository-safe ignore rules for the executable, working copies, traces, dumps, logs, and Ghidra projects.
 - Added `AGENTS.md` to make relative-path and machine-privacy rules persistent for future work.
+- Completed the Phase 2 static map without executing the program.
+- Identified separate frontend and gameplay timer handlers plus a persistent raw-scan-code keyboard handler.
+- Mapped the live game as an interrupt-driven simulation feeding a foreground XOR renderer through dirty state.
+- Identified mirrored player/projectile pools implemented as parallel fixed-point state arrays.
+- Identified inline display data consumed by return-address manipulation, explaining unreliable linear disassembly boundaries.
+- Recorded a Phase 3 breakpoint plan using runtime `CS:` offsets.
