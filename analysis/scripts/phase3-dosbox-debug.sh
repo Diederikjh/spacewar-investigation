@@ -22,10 +22,12 @@ mkdir -p "$run_dir" "$trace_dir"
 cp -- "$source_binary" "$break_binary"
 chmod u=rw,go= "$break_binary"
 
-# The MZ entry point is at file offset 0x2CB0. The temporary INT 3 is
+# The MZ entry point is at file offset 0x2CB0. The temporary INT 03h is
 # restored in guest memory before execution continues from CS:0000.
-entry_byte=$(xxd -p -s 0x2cb0 -l 1 "$break_binary")
-test "$entry_byte" = '8c'
-radare2 -2 -q -w -c 's 0x2cb0; wx cc' "$break_binary"
+entry_bytes=$(xxd -p -s 0x2cb0 -l 2 "$break_binary")
+test "$entry_bytes" = '8cd8'
+radare2 -n -2 -q -w -c 's 0x2cb0; wx cd03' "$break_binary"
+patched_entry_bytes=$(xxd -p -s 0x2cb0 -l 2 "$break_binary")
+test "$patched_entry_bytes" = 'cd03'
 
 exec "$debugger_binary" -conf analysis/config/dosbox-debug.conf
