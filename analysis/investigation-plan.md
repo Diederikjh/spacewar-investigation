@@ -24,10 +24,14 @@ The investigation aims to recover architectural intent and important data struct
 | Phase | Status | Outcome |
 |---|---|---|
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
-| 2. Lightweight static map | Complete; awaiting review | Static architecture and function ledger recorded in `static-map.md` and `function-ledger.csv` |
+| 2. Lightweight static map | Complete; awaiting review | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
 | 3. Controlled DOSBox-X runs | Ready for review | Correlate small behavioral experiments with code addresses |
 | 4. Ghidra analysis | Not started | Recover functions, call relationships, structures, and pseudocode |
 | 5. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
+
+## Findings-document convention
+
+Each completed phase has one primary narrative findings document named `analysis/phase-N-findings.md`, where `N` is the phase number. Supporting ledgers, scripts, traces, and inventories remain separate and are linked or referenced from that document.
 
 ## Phase 1: Preserve and classify
 
@@ -84,7 +88,7 @@ Proposed native tools: DOSBox-X, radare2, and NASM/ndisasm. Show and review the 
 ### Outputs
 
 - `analysis/function-ledger.csv`
-- `analysis/static-map.md`
+- `analysis/phase-2-findings.md`
 - Annotated disassembly extracts under `analysis/inventory/`
 
 ## Phase 3: Controlled DOSBox-X runs
