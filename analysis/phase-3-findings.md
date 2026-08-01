@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 3 is in progress. The isolated emulator setup, bounded baseline run, runtime entry capture, and frontend timer correlation are complete. The Play transition, gameplay timer-vector confirmation, and input-specific experiments remain pending.
+Phase 3 is in progress. The isolated emulator setup, bounded baseline run, runtime entry capture, frontend timer correlation, and F2 Play transition are complete. Input-specific experiments remain pending.
 
 The current gate is debugger interaction, not executable behavior: the normal DOSBox-X run reaches the game frontend, while the packaged DOSBox-X build does not expose a usable debugger in this environment. A lightweight DOSBox debug build provides the required command set, but its curses console should be run from a normal terminal rather than through an automated pseudo-terminal.
 
@@ -25,7 +25,7 @@ The current gate is debugger interaction, not executable behavior: the normal DO
 | P3-04 | Lightweight debugger command check | Start the alternate debug build without running a full game session | The debugger console and required `BP`, `BPINT`, `RUN`, `SM`, `SR`, and bounded logging commands are present | Complete |
 | P3-05 | Runtime entry capture | Break at the executable entry and record the runtime code segment | Entry confirmed at `044C:0000`; original bytes restored before execution | Complete |
 | P3-06 | Frontend timer correlation | Break at `CS:0940` and `CS:172D`; inspect interrupt vector 8 | Frontend entry and timer handler confirmed; vector 8 changed from `F000:FEA5` to `044C:172D` | Complete |
-| P3-07 | Play transition | Press F2 once; break at `CS:00BC` and `CS:233D` | Not started | Pending |
+| P3-07 | Play transition | Press F2 once; break at `CS:00BC` and `CS:233D` | F2 reached game entry; vector 8 changed from `044C:172D` to `044C:233D` | Complete |
 | P3-08 | Single input comparison | Send one movement key and one action key in separate bounded runs | Not started | Pending |
 
 ## Baseline observations
@@ -104,6 +104,20 @@ After the frontend initialization calls ran, the next breakpoint stopped at `044
 
 This confirms that frontend initialization replaces the BIOS timer vector with the proposed frontend timer handler and that the handler is reached at the programmed tick rate. No Play input was sent, so the proposed gameplay timer handler remains outside this experiment.
 
+## P3-07 Play transition and gameplay timer
+
+With breakpoints set at `044C:00BC` and `044C:233D`, one F2 keypress at the frontend stopped execution at `044C:00BC`. This confirms the proposed Play transition and game entry.
+
+At the game-entry stop:
+
+- Interrupt vector 8 still contained `2D 17 4C 04`, pointing to the frontend timer handler at `044C:172D`.
+- The game startup reset `SP` to `0166`, cleared shared frontend/game state, and called the initialization sequence identified statically.
+- That sequence included a call to `044C:1F14`, the proposed game-timer installer.
+
+After resuming, the next timer breakpoint stopped at `044C:233D`. Interrupt vector 8 then contained `3D 23 4C 04`, the little-endian pointer `044C:233D`. Interrupt vector 9 remained `80 1F 4C 04`, so the keyboard handler continued at `044C:1F80` across the mode transition.
+
+The game timer handler begins by preserving general and segment registers before loading the program data segment, matching the static classification of a substantial simulation ISR. The experiment stopped on this first confirmed game-timer hit; no movement or action input was sent.
+
 ## Expected address correlations
 
 These remain hypotheses until P3-05 through P3-07 are complete:
@@ -113,10 +127,10 @@ These remain hypotheses until P3-05 through P3-07 are complete:
 | `0000` | Executable entry | Confirmed at `044C:0000`; original entry bytes restored |
 | `0940` | Frontend entry | Confirmed at `044C:0940`, before frontend initialization calls |
 | `172D` | Frontend timer handler | Confirmed at `044C:172D`; interrupt vector 8 contains `2D 17 4C 04` |
-| `00BC` | Game entry | Trigger exactly one F2 Play transition |
-| `233D` | Game timer handler | Confirm interrupt vector 8 changes after Play |
+| `00BC` | Game entry | Confirmed at `044C:00BC` after exactly one F2 keypress |
+| `233D` | Game timer handler | Confirmed at `044C:233D`; interrupt vector 8 contains `3D 23 4C 04` |
 | `1F80` | Keyboard handler | Reserve for the later single-input experiments |
 
 ## Phase gate
 
-Do not begin Phase 4 yet. Phase 3 should first verify the frontend-to-game timer-vector change and complete the two single-input experiments. If the lightweight debugger behaves differently in a normal terminal, record the exact command and observed state in this document without adding host or package-version details.
+Do not begin Phase 4 yet. Phase 3 should first complete the two single-input experiments. If the lightweight debugger behaves differently in a normal terminal, record the exact command and observed state in this document without adding host or package-version details.
