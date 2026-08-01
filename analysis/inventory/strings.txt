@@ -1,0 +1,136 @@
+    200 SORRY !  You need a 640 X 200 Color Graphics card to run SPACEWAR !$May the farce be with you.$
+   1428 -MKQOGILHP
+   1628 88p@
+   1674 p@88
+   2266 #"(%&(
+   229f hmj#l
+   22af uAvkw
+   22b7 y|z\{)|
+   22e3 |)|\{|z
+   22ed xkwAv
+   22fd m#lmj
+   2335 +&((%#"
+   2475 <n@jD
+   2ce5 &9=ul+
+   3523 FFMu
+   3647 V1.50
+   3656 COPYRIGHT  
+   3662  1985  B SEILER.
+   37ae    G A M E    K E Y S  
+   37f2 LEFT PLAYER KEYS
+   3820 RIGHT PLAYER KEYS
+   3868     
+   3890    Q   
+   3898    W   
+   38a0    E   
+   38a8     
+   38ad    7   
+   38b5    8   
+   38bd    9   
+   38d1  FIRE 
+   38d9        
+   38e2  FIRE 
+   38ea     
+   38f0  FIRE 
+   38f8        
+   3901  FIRE 
+   3914 PHASERS
+   391c  CLOAK 
+   3924 PHOTONS
+   392c     
+   3931 PHASERS
+   3939  CLOAK 
+   3941 PHOTONS
+   396c     
+   3994    A   
+   399c    S   
+   39a4    D   
+   39ac     
+   39b1    4   
+   39b9    5   
+   39c1    6   
+   39d5 ROTATE
+   39dd IMPULSE
+   39e6 ROTATE
+   39ee     
+   39f4 ROTATE
+   39fc IMPULSE
+   3a05 ROTATE
+   3a18   CCW  
+   3a20 ENGINES
+   3a29   CW  
+   3a31     
+   3a36   CCW  
+   3a3e ENGINES
+   3a47   CW  
+   3a72     
+   3a9a    Z   
+   3aa2    X   
+   3aaa    C   
+   3ab2     
+   3ab7    1   
+   3abf    2   
+   3ac7    3   
+   3adb WEAPON
+   3ae3  HYPER 
+   3aec SHIELD
+   3af4     
+   3afa WEAPON
+   3b02  HYPER 
+   3b0b SHIELD
+   3b1f ENERGY
+   3b27  SPACE 
+   3b30 ENERGY
+   3b38     
+   3b3e ENERGY
+   3b46  SPACE 
+   3b4f ENERGY
+   3b7a     
+   3bd5    G A M E    I N S T R U C T I O N S  
+   3c39 OBJECT: Destroy the other ship with PHOTON TORPEDOS or
+   3c71         PHASERS until all its SHIELD energy is gone.
+   3ca9 WEAPONS:PHOTON TORPEDOS - Use = 1 unit, Damage = 4 units.
+   3ce4         PHASERS         - Use = 1 unit, Damage = 2 units.
+   3d21 DEFENSE:IMPULSE ENGINES - Use = 1 unit every 1/2 second.
+   3d5b         CLOAK           - Use = 1 unit every 1/2 second.
+   3d95         HYPER SPACE     - Use = 8 units.
+   3dbf COMMENT:You must have energy to use WEAPONS or DEFENCES.
+   3df9         ENERGY is recharged at 1 unit every 2 seconds.
+   3e31         Use PHASERS to shoot incoming PHOTON TORPEDOS.
+   3e69         The WARNING sound indicates SHIELD power too low.
+   3ea4         Touching the PLANET will drain your SHIELDS.
+   3eda         The Left Robot player is defensive.
+   3f07         The Right Robot player is offensive.
+   3f35         Function key 8 toggles sound on or off.
+   3f70 	SPACEWAR is distributed under the USER-SUPPORTED
+   3fa3 concept.  You are encouraged to copy and share this
+   3fd8 program with other users.  If you enjoy SPACEWAR, and want me
+   4017 to finish SPACE MINEZ your contribution ($20 suggested) will
+   4055 be appreciated.  For a $30 contribution you will receive the
+   4093 source code for latest version of SPACEWAR.
+   40c2 USER-SUPPORTED software is based on these three beliefs:
+   40fc  1.  The value of software is best assessed by the
+   4130      user on his own system.
+   414e  2.  Creation of personal computer software can and
+   4183      should be supported by computing community.
+   41b5  3.  That copying of programs should be encourged,
+   41e9      rather than restricted.
+   4209 Bill Seiler == 317 Lockewood Lane == Scotts Valley, CA. 95066
+   42ea  EXIT 
+   42f4  PLAY 
+   42fe ROBOT
+   4308 ROBOT
+   4312 PLANET
+   4319   GRAVITY   PAUSE 
+   43dd PSQRVWU
+   4528 ]_^ZY[X
+   4717 FF;62	sA
+   4766 t-x+
+   476f t$x"
+   47c4 @	&0
+   480b &0%G&0
+   4c7c HP@P
+   4d9d  +!b!
+   4fed PSQRVWU
+   5455 ]_^ZY[X
+   5528 X$ t

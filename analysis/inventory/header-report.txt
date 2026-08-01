@@ -1,0 +1,33 @@
+File: analysis/work/Spacewar1985.exe
+Actual file size: 22528 bytes (0x5800)
+Magic: MZ (hex 4d5a)
+Bytes in last 512-byte page: 404 (0x0194)
+512-byte pages: 44 (0x002C)
+Declared executable size: 22420 bytes (0x5794)
+Header paragraphs: 32
+Header size: 512 bytes (0x200)
+Load-module size: 21908 bytes (0x5594)
+Relocations: 5
+Relocation-table offset: 0x001C
+Minimum extra paragraphs: 1 (16 bytes)
+Maximum extra paragraphs: 65535 (1048560 bytes)
+Initial CS:IP: 02AB:0000
+Entry offset within load module: 0x02AB0
+Initial SS:SP: 0000:0000
+Initial stack position within load module: 0x00000
+Checksum: 0xF173
+Overlay number: 0
+Bytes after declared executable image: 108
+e_lfanew candidate: 0x00000000
+Relocation entries (segment:offset within load module):
+  [0] 02AB:0007 (linear 0x02AB7)
+  [1] 02AB:0060 (linear 0x02B10)
+  [2] 02AB:173B (linear 0x041EB)
+  [3] 02AB:1F85 (linear 0x04A35)
+  [4] 02AB:2347 (linear 0x04DF7)
+Validation:
+  Magic is MZ/ZM: yes
+  Declared size matches actual: no
+  Header fits declared image: yes
+  Entry lies in load module: yes
+  Relocation table fits header: yes

@@ -1,0 +1,8 @@
+File size: 22528 bytes
+Shannon entropy: 5.3928 bits/byte
+Distinct byte values: 254 of 256
+Printable ASCII bytes: 5092 (22.60%)
+Zero bytes: 8315 (36.91%)
+Extracted strings (minimum length 4): 136
+Characters in extracted strings: 2302
+Approximate extracted-string density: 10.22%

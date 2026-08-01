@@ -1,0 +1,17 @@
+# The game executable is not intended for the future public repository.
+/artefact/*
+/analysis/work/*
+
+# Runtime captures may contain proprietary program data.
+/analysis/dumps/*
+/analysis/traces/*
+
+# Local analysis projects and caches.
+/analysis/ghidra/*
+*.gpr
+*.rep/
+
+# Emulator and tool noise.
+LOGCPU.TXT
+*.log
+.DS_Store

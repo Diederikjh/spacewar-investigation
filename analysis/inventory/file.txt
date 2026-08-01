@@ -1,0 +1,3 @@
+Path: artefact/Spacewar1985.exe
+Size: 22528 bytes
+artefact/Spacewar1985.exe: MS-DOS executable, MZ for MS-DOS\012- data
