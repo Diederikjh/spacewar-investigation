@@ -36,3 +36,10 @@
 - Do not commit the game executable, working copies, memory dumps, runtime traces, emulator logs, or local analysis project databases.
 - Before each commit, audit staged text for absolute paths and machine-specific identifiers, and confirm ignored proprietary artefacts are not staged.
 - When a generated report leaks host information, fix its generator and regenerate the report rather than editing only the generated output.
+
+## Commit review workflow
+
+- Do not create or amend a commit automatically after making changes.
+- Before every commit, present the proposed changes and relevant diff to the user for review.
+- Wait for explicit user approval to commit; approval of the underlying task does not also authorize a commit.
+- Keep reviewed changes uncommitted until that approval is received.
