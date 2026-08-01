@@ -25,7 +25,7 @@ The investigation aims to recover architectural intent and important data struct
 |---|---|---|
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
-| 3. Controlled DOS runs | In progress | Baseline run and runtime entry capture complete; remaining experiments recorded in `phase-3-findings.md` |
+| 3. Controlled DOS runs | In progress | Baseline, runtime entry, and frontend timer correlation complete; remaining experiments recorded in `phase-3-findings.md` |
 | 4. Ghidra analysis | Not started | Recover functions, call relationships, structures, and pseudocode |
 | 5. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -99,7 +99,8 @@ Proposed native tools: DOSBox-X, radare2, and NASM/ndisasm. Show and review the 
 - [x] Mount only an isolated writable run directory.
 - [x] Complete a bounded baseline startup and idle run.
 - [x] Capture the executable-entry registers and segments.
-- [ ] Capture a bounded startup trace and relevant interrupts.
+- [x] Confirm the frontend entry, frontend timer handler, and interrupt vector 8.
+- [ ] Capture any additional bounded startup trace required by later questions.
 - [ ] Run controlled experiments: immediate exit, one movement input, and one game action.
 - [ ] Compare traces to isolate action-specific paths.
 - [x] Confirm that no unpacking dump is required because Phase 1 classified the executable as unpacked.

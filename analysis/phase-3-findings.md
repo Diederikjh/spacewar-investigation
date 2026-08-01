@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 3 is in progress. The isolated emulator setup, bounded baseline run, and runtime entry capture are complete. Interrupt-vector confirmation and input-specific experiments remain pending.
+Phase 3 is in progress. The isolated emulator setup, bounded baseline run, runtime entry capture, and frontend timer correlation are complete. The Play transition, gameplay timer-vector confirmation, and input-specific experiments remain pending.
 
 The current gate is debugger interaction, not executable behavior: the normal DOSBox-X run reaches the game frontend, while the packaged DOSBox-X build does not expose a usable debugger in this environment. A lightweight DOSBox debug build provides the required command set, but its curses console should be run from a normal terminal rather than through an automated pseudo-terminal.
 
@@ -24,7 +24,7 @@ The current gate is debugger interaction, not executable behavior: the normal DO
 | P3-03 | Packaged DOSBox-X debugger check | Test entry command, startup break, and debugger hotkey without tracing | Normal execution works, but `DEBUGBOX` is rejected and neither startup-break nor hotkey testing produced a debugger stop | Complete |
 | P3-04 | Lightweight debugger command check | Start the alternate debug build without running a full game session | The debugger console and required `BP`, `BPINT`, `RUN`, `SM`, `SR`, and bounded logging commands are present | Complete |
 | P3-05 | Runtime entry capture | Break at the executable entry and record the runtime code segment | Entry confirmed at `044C:0000`; original bytes restored before execution | Complete |
-| P3-06 | Frontend timer correlation | Break at `CS:0940` and `CS:172D`; inspect interrupt vector 8 | Not started | Pending |
+| P3-06 | Frontend timer correlation | Break at `CS:0940` and `CS:172D`; inspect interrupt vector 8 | Frontend entry and timer handler confirmed; vector 8 changed from `F000:FEA5` to `044C:172D` | Complete |
 | P3-07 | Play transition | Press F2 once; break at `CS:00BC` and `CS:233D` | Not started | Pending |
 | P3-08 | Single input comparison | Send one movement key and one action key in separate bounded runs | Not started | Pending |
 
@@ -89,6 +89,21 @@ The segment values corroborate the MZ layout from Phase 1:
 - `SS=01A1` and `ESP=00000000` match the header's `SS:SP=0000:0000` relative to the load-module base.
 - The first restored instruction at `044C:0000` is `8C D8` (`mov ax,ds`), confirming the entry mapping and preserving the DOS-provided data-segment value for startup.
 
+## P3-06 frontend timer correlation
+
+Execution first stopped at `044C:0940`, confirming the proposed frontend entry. The visible instructions begin by disabling interrupts, setting `SP=0166`, clearing frontend state, and calling the initialization routines identified in Phase 2.
+
+At the frontend entry, interrupt vector 8 still contained bytes `A5 FE 00 F0`, which decode to the BIOS handler `F000:FEA5`. The adjacent interrupt vector 9 already contained `80 1F 4C 04`, confirming the keyboard handler at `044C:1F80` as an incidental cross-check.
+
+After the frontend initialization calls ran, the next breakpoint stopped at `044C:172D`. At that stop:
+
+- Interrupt vector 8 contained `2D 17 4C 04`, the little-endian pointer `044C:172D`.
+- The runtime log reported PIT channel 0 operating in mode 3 at approximately 72.8 Hz.
+- The handler began with register and segment preservation followed by its interrupt-controller acknowledgement path, matching the static ISR classification.
+- `DS=B800` at interruption time shows that the timer interrupted foreground graphics work; the handler's prologue preserves that caller state before using its own data.
+
+This confirms that frontend initialization replaces the BIOS timer vector with the proposed frontend timer handler and that the handler is reached at the programmed tick rate. No Play input was sent, so the proposed gameplay timer handler remains outside this experiment.
+
 ## Expected address correlations
 
 These remain hypotheses until P3-05 through P3-07 are complete:
@@ -96,8 +111,8 @@ These remain hypotheses until P3-05 through P3-07 are complete:
 | Runtime code offset | Proposed role | Dynamic confirmation |
 |---|---|---|
 | `0000` | Executable entry | Confirmed at `044C:0000`; original entry bytes restored |
-| `0940` | Frontend entry | Break after startup reaches the instructions/options screen |
-| `172D` | Frontend timer handler | Confirm interrupt vector 8 and repeated frontend ticks |
+| `0940` | Frontend entry | Confirmed at `044C:0940`, before frontend initialization calls |
+| `172D` | Frontend timer handler | Confirmed at `044C:172D`; interrupt vector 8 contains `2D 17 4C 04` |
 | `00BC` | Game entry | Trigger exactly one F2 Play transition |
 | `233D` | Game timer handler | Confirm interrupt vector 8 changes after Play |
 | `1F80` | Keyboard handler | Reserve for the later single-input experiments |
