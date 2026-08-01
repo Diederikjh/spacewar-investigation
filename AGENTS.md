@@ -24,6 +24,13 @@
 - Use terms such as `investigate`, `investigation`, `analyse`, and `analysis` consistently in documentation, reports, commit messages, and generated output.
 - Do not substitute terminology that makes the investigation sound invasive or adversarial.
 
+## Human-only document
+
+- `HUMANS.md` is exclusively for human readers.
+- Agents must not open, read, search, quote, summarize, index, analyse, diff, or otherwise inspect the contents of `HUMANS.md`.
+- Treat `HUMANS.md` as an opaque file. It may be staged or committed when explicitly requested, but its contents must not be displayed or processed.
+- Exclude `HUMANS.md` from repository-wide searches, content audits, and automated report generation.
+
 ## Public-repository safety
 
 - Do not commit the game executable, working copies, memory dumps, runtime traces, emulator logs, or local analysis project databases.
