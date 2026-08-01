@@ -24,8 +24,8 @@ The investigation aims to recover architectural intent and important data struct
 | Phase | Status | Outcome |
 |---|---|---|
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
-| 2. Lightweight static map | Complete; awaiting review | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
-| 3. Controlled DOSBox-X runs | Ready for review | Correlate small behavioral experiments with code addresses |
+| 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
+| 3. Controlled DOS runs | In progress | Isolated baseline run complete; debugger path and remaining experiments recorded in `phase-3-findings.md` |
 | 4. Ghidra analysis | Not started | Recover functions, call relationships, structures, and pseudocode |
 | 5. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -91,21 +91,22 @@ Proposed native tools: DOSBox-X, radare2, and NASM/ndisasm. Show and review the 
 - `analysis/phase-2-findings.md`
 - Annotated disassembly extracts under `analysis/inventory/`
 
-## Phase 3: Controlled DOSBox-X runs
+## Phase 3: Controlled DOS runs
 
 ### Tasks
 
-- Verify debugger support in the packaged DOSBox-X build.
-- Mount only an isolated writable run directory.
-- Capture initial registers, segments, a bounded startup trace, and relevant interrupts.
-- Run controlled experiments: immediate exit, idle, one movement input, and one game action.
-- Compare traces to isolate action-specific paths.
-- If packed, dump expanded memory immediately after transfer to the real entry point.
+- [x] Verify debugger support in the packaged DOSBox-X build.
+- [x] Mount only an isolated writable run directory.
+- [x] Complete a bounded baseline startup and idle run.
+- [ ] Capture initial registers, segments, a bounded startup trace, and relevant interrupts.
+- [ ] Run controlled experiments: immediate exit, one movement input, and one game action.
+- [ ] Compare traces to isolate action-specific paths.
+- [x] Confirm that no unpacking dump is required because Phase 1 classified the executable as unpacked.
 
 ### Outputs
 
 - DOSBox-X configuration under `analysis/config/`
-- Experiment log and trace index
+- Primary findings and experiment log in `analysis/phase-3-findings.md`
 - Bounded traces under `analysis/traces/`
 - Runtime dumps under `analysis/dumps/` only when required
 
