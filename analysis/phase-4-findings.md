@@ -2,20 +2,20 @@
 
 ## Status
 
-Phase 4 is in progress at its setup gate. The proposed container workflow below is ready for review. No container image has been downloaded or built, and the executable has not been imported.
+Phase 4 is in progress. P4-01 is complete: the approved pinned container was built, the official Ghidra archive matched its published SHA-256, and the dependency smoke test passed under the planned runtime constraints. The executable has not yet been imported; P4-02 is ready to start.
 
 ## Task log
 
 | ID | Task | Evidence boundary | Status |
 |---|---|---|---|
-| P4-01 | Review the pinned Ghidra container setup | Select and record exact inputs, isolation, mounts, and storage before any download | In review |
-| P4-02 | Import and reproduce address mappings | Confirm the MZ loader, 16-bit real-mode language, entry point, and Phase 1/3 address conversions | Not started |
+| P4-01 | Review the pinned Ghidra container setup | Select and record exact inputs, isolation, mounts, and storage before any download | Complete |
+| P4-02 | Import and reproduce address mappings | Confirm the MZ loader, 16-bit real-mode language, entry point, and Phase 1/3 address conversions | Ready |
 | P4-03 | Apply the static function map | Transfer high-confidence functions and subsystem boundaries from `analysis/function-ledger.csv` | Not started |
 | P4-04 | Recover random-number design | Express seeding, the five-byte recurrence, caller range mapping, and repeatability | Not started |
 | P4-05 | Recover star and background generation | Explain frontend star initialization/animation and gameplay background placement | Not started |
 | P4-06 | Prepare the computer-player handoff | Identify decision entries, action leaves, state inputs, and random-number calls for Phase 5 | Not started |
 
-## P4-01 proposed container setup
+## P4-01 validated container setup
 
 ### Pinned inputs
 
@@ -24,7 +24,7 @@ Phase 4 is in progress at its setup gate. The proposed container workflow below 
 - Java 21, matching the [Ghidra 12.1.2 getting-started requirements](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.1.2_build/GhidraDocs/GettingStarted.md#software).
 - Docker Official Image `eclipse-temurin:21.0.11_10-jdk-jammy`, pinned to its multi-platform index digest `sha256:9d8dcf999b0bce2453e913823595a5ff2a4e8e9e5d5241b45280d0ff069818ec`.
 
-The proposed Dockerfile will download only the official Ghidra archive during the image build, validate its SHA-256 before extraction, and fail the build on any mismatch. No third-party Ghidra image or extension is proposed.
+The Dockerfile downloads only the official Ghidra archive during the image build, validates its SHA-256 before extraction, and fails the build on any mismatch. No third-party Ghidra image or extension is used.
 
 ### Initial operating mode
 
@@ -43,16 +43,18 @@ The analysis container will run with:
 
 Raw Ghidra projects, caches, listings, and decompiler exports will remain under the already ignored `analysis/ghidra/` tree. Only evidence-backed summaries, selected pseudocode, and symbol/data ledgers intended for publication will be added to tracked files.
 
-### Files proposed after approval
+### Setup files
 
 - `analysis/docker/ghidra/Dockerfile` — pinned, checksum-verifying image definition.
 - `analysis/scripts/phase4-ghidra-build.sh` — image build and identity verification.
 - `analysis/scripts/phase4-ghidra-headless.sh` — constrained headless runner using repository-relative source paths.
-- A focused Ghidra script under `analysis/ghidra-scripts/` for address, symbol, call, and decompiler exports when the import is confirmed.
+- A focused Ghidra script under `analysis/ghidra-scripts/` will be added for address, symbol, call, and decompiler exports when the import is confirmed.
 
-### Approval boundary
+### Validation result
 
-Approval of P4-01 will authorize creation of the proposed setup files, the approximately 573 MB Ghidra release download during the Docker build, the pinned Java base-image download, and a smoke test that prints project dependency information only. Importing `analysis/work/Spacewar1985.exe` will remain P4-02 and will start only after the built image and launch constraints have been validated.
+The image build resolved the Java base by its recorded digest and downloaded the official Ghidra release archive. The archive matched the expected SHA-256 before extraction. The final image label identified Ghidra `12.1.2`, and the isolated smoke test identified the selected Java `21.0.11` runtime and Ghidra `12.1.2` application version.
+
+The smoke test ran without network access, with a read-only root filesystem, dropped capabilities, disabled privilege escalation, bounded resources, and a temporary `/tmp`. It did not mount the repository or executable. P4-02 will be the first operation to mount the ignored working executable, read-only, into the container.
 
 ## Evidence and uncertainty policy
 
