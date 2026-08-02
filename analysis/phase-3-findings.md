@@ -207,4 +207,4 @@ The following runtime correlations have now been confirmed:
 
 ## Phase gate
 
-The planned Phase 3 gate is satisfied. Do not begin Phase 4 automatically: first review these findings and agree the Phase 4 scope. Any later runtime trace should answer a specific new question and remain explicitly bounded.
+The planned Phase 3 gate is satisfied, and Phase 4 is ready to begin with the reviewed Docker/Ghidra setup and scope in `analysis/investigation-plan.md`. Any later runtime trace should answer a specific new question and remain explicitly bounded.
