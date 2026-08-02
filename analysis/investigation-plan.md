@@ -25,7 +25,7 @@ The investigation aims to recover architectural intent and important data struct
 |---|---|---|
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
-| 3. Controlled DOS runs | In progress | Runtime entry and frontend-to-game timer transition confirmed; remaining experiments recorded in `phase-3-findings.md` |
+| 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
 | 4. Ghidra analysis | Not started | Recover functions, call relationships, structures, and pseudocode |
 | 5. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -101,9 +101,10 @@ Proposed native tools: DOSBox-X, radare2, and NASM/ndisasm. Show and review the 
 - [x] Capture the executable-entry registers and segments.
 - [x] Confirm the frontend entry, frontend timer handler, and interrupt vector 8.
 - [x] Confirm the F2 Play transition, game entry, and gameplay timer handler.
-- [ ] Capture any additional bounded startup trace required by later questions.
-- [ ] Run controlled experiments: immediate exit, one movement input, and one game action.
-- [ ] Compare traces to isolate action-specific paths.
+- [x] Confirm that no additional startup trace is required for the current Phase 3 questions.
+- [x] Run the controlled immediate-exit experiment.
+- [x] Run one movement input and one game action in separate bounded experiments.
+- [x] Compare bounded breakpoint observations to isolate the movement and phaser paths.
 - [x] Confirm that no unpacking dump is required because Phase 1 classified the executable as unpacked.
 
 ### Outputs
@@ -162,3 +163,14 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Identified mirrored player/projectile pools implemented as parallel fixed-point state arrays.
 - Identified inline display data consumed by return-address manipulation, explaining unreliable linear disassembly boundaries.
 - Recorded a Phase 3 breakpoint plan using runtime `CS:` offsets.
+
+### 2026-08-02
+
+- Confirmed the F2 transition from the frontend to game entry and the replacement gameplay timer handler.
+- Confirmed that left-player `A` reaches the rotate-counter-clockwise handler at `044C:02B6`.
+- Confirmed that left-player `Q` reaches the phaser handler at `044C:0300`.
+- Measured the phaser handler changing energy from `7F` to `7E` and its state byte from `FF` to `18` before the follow-up call.
+- Kept both input experiments bounded and separate; no unrestricted trace or runtime dump was produced.
+- Confirmed that F1 reaches the shutdown path, restores the original timer and keyboard vectors, traverses the PIT-restoration code, and terminates normally.
+- Validated debugger commands with narrow screenshot crops; the pre-Enter checkpoint caught incomplete synthetic input before it could affect a run.
+- Completed Phase 3 without producing a runtime dump or committing temporary screenshots.

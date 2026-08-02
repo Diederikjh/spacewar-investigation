@@ -2,9 +2,9 @@
 
 ## Status
 
-Phase 3 is in progress. The isolated emulator setup, bounded baseline run, runtime entry capture, frontend timer correlation, and F2 Play transition are complete. Input-specific experiments remain pending.
+Phase 3 is complete. The isolated emulator setup, bounded baseline run, runtime entry capture, frontend timer correlation, F2 Play transition, separate movement/phaser experiments, and controlled immediate exit all produced the required bounded evidence. No unrestricted trace or runtime dump was required.
 
-The current gate is debugger interaction, not executable behavior: the normal DOSBox-X run reaches the game frontend, while the packaged DOSBox-X build does not expose a usable debugger in this environment. A lightweight DOSBox debug build provides the required command set, but its curses console should be run from a normal terminal rather than through an automated pseudo-terminal.
+The normal DOSBox-X run reaches the game frontend, while the packaged DOSBox-X build does not expose a usable debugger in this environment. The lightweight DOSBox debug route now provides the required command set; its curses console should be run from a normal terminal, and each breakpoint should be confirmed before execution resumes.
 
 ## Isolation and reproducibility
 
@@ -26,7 +26,8 @@ The current gate is debugger interaction, not executable behavior: the normal DO
 | P3-05 | Runtime entry capture | Break at the executable entry and record the runtime code segment | Entry confirmed at `044C:0000`; original bytes restored before execution | Complete |
 | P3-06 | Frontend timer correlation | Break at `CS:0940` and `CS:172D`; inspect interrupt vector 8 | Frontend entry and timer handler confirmed; vector 8 changed from `F000:FEA5` to `044C:172D` | Complete |
 | P3-07 | Play transition | Press F2 once; break at `CS:00BC` and `CS:233D` | F2 reached game entry; vector 8 changed from `044C:172D` to `044C:233D` | Complete |
-| P3-08 | Single input comparison | Send one movement key and one action key in separate bounded runs | Not started | Pending |
+| P3-08 | Single input comparison | Send one movement key and one action key in separate bounded runs | `A` reached `044C:02B6`; `Q` reached `044C:0300` and changed energy/state before `044C:0316` | Complete |
+| P3-09 | Immediate exit and crop validation | Press F1 once; bound shutdown and restoration; validate commands with narrow crops | F1 reached `044C:0095`; vectors 8 and 9 were restored before normal termination; crops caught incomplete input before Enter | Complete |
 
 ## Baseline observations
 
@@ -47,15 +48,32 @@ These observations do not yet prove the proposed code addresses. That correlatio
 Use the following bounded procedure in a normal terminal:
 
 1. Run `analysis/scripts/phase3-dosbox-debug.sh`.
-2. At the debugger's initial stop, enter `BPINT 3`, then press F5 to resume.
-3. At the DOS `PAUSE`, focus the emulator window and press one key.
-4. When interrupt 3 breaks at the executable entry, record `CS`. This debugger stops before executing the interrupt, so `EIP` should remain `00000000`.
-5. Restore the original entry bytes with `SM <CS>:0000 8C D8`.
-6. Verify the restored instruction with `C <CS>:0000`. Reset `EIP` only if it is not already `00000000`.
-7. Set `BP <CS>:0940` and `BP <CS>:172D`, then press F5.
-8. At the frontend, inspect interrupt vector 8 with `D 0000:0020`. The four bytes are the little-endian offset followed by the segment.
-9. Set `BP <CS>:00BC` and `BP <CS>:233D`, press F5, then press F2 once in the emulator.
-10. Stop after the first few game-timer hits. Do not enable an unrestricted trace.
+2. At the DOS `PAUSE`, focus the emulator window and press Alt+Pause to open debugger command input.
+3. Enter `BPINT 3`, verify the acknowledgement, then press F5 to resume.
+4. Focus the emulator window and press one key to pass the DOS `PAUSE`.
+5. When interrupt 3 breaks at the executable entry, record `CS`. This debugger stops before executing the interrupt, so `EIP` should remain `00000000`.
+6. Restore the original entry bytes with `SM <CS>:0000 8C D8`.
+7. Verify the restored instruction with `C <CS>:0000`. Reset `EIP` only if it is not already `00000000`.
+8. Set `BP <CS>:0940` and `BP <CS>:172D`, then confirm them with `BPLIST` before pressing F5.
+9. At the frontend, inspect interrupt vector 8 with `D 0000:0020`. The four bytes are the little-endian offset followed by the segment.
+10. Set `BP <CS>:00BC` and `BP <CS>:233D`, confirm them with `BPLIST`, press F5, then press F2 once in the emulator.
+11. Stop after the first few game-timer hits. Do not enable an unrestricted trace.
+
+Key-release events generated while entering the debugger can remain queued for the guest. When investigating the keyboard handler, identify events by their scan-code byte rather than assuming the first stop belongs to the requested input. In this run, `BC`/index `3C` was F2 release and `B8`/index `38` was Alt release; neither was counted as movement evidence.
+
+### Cropped-image command validation
+
+Use local screenshot crops instead of OCR when the debugger terminal is being driven indirectly. Keep each crop at its original resolution and include only the evidence required for the current checkpoint:
+
+1. After typing a command, inspect a crop containing the `->` input line and verify every character before pressing Enter.
+2. Press Enter only while the debugger terminal is focused.
+3. Inspect a crop of the latest output lines and confirm that the input line cleared and the expected `DEBUG:` acknowledgement appeared.
+4. For breakpoints, run `BPLIST` and inspect a crop containing the exact registered address before pressing F5.
+5. When execution stops, crop the `CS:EIP` registers, relevant code rows, and required data bytes separately. Use a larger crop or the full debugger window only when a narrow crop is ambiguous.
+
+Do not resume execution when any checkpoint is missing. Store screenshots and crops only as temporary local files, remove them after validation, and do not add them to the repository.
+
+When commands are driven indirectly, prefer individual key events over a batch of typed text. In P3-09, pre-Enter crops caught two incomplete commands (`B` instead of `BPINT 3`, and `d 00` instead of `d 0000:0020`). Both were corrected before Enter; the complete breakpoint set was then confirmed with `BPLIST`.
 
 For a small trace around a confirmed breakpoint, use `LOGS 16` or another explicitly bounded instruction count. Raw logs belong under `analysis/traces/phase3` and must not be committed.
 
@@ -118,9 +136,59 @@ After resuming, the next timer breakpoint stopped at `044C:233D`. Interrupt vect
 
 The game timer handler begins by preserving general and segment registers before loading the program data segment, matching the static classification of a substantial simulation ISR. The experiment stopped on this first confirmed game-timer hit; no movement or action input was sent.
 
+## P3-08 single input comparison
+
+The movement and action inputs were sent in separate bounded gameplay runs. Interrupt vector 8 contained `3D 23 4C 04` during the action run, independently confirming that the guest was using the gameplay timer handler at `044C:233D` rather than showing only the frontend demonstration.
+
+### Movement: left-player A
+
+One `A` input reached `044C:02B6`, the pressed-action target associated with scan code `1E` in the left-player key table. The handler contains two state changes:
+
+- write `FE` (-2) to `[0E9C]`, the left-player rotation command;
+- set bit 0 in `[0E1C]`, marking pending player state.
+
+Execution was then bounded at `044C:02C1`. The rotation command had returned to zero by the later memory display. The most likely explanation is that the interrupt-driven simulation consumed the transient foreground command between the handler and the observation; this is an inference consistent with the producer/consumer design identified statically.
+
+### Action: left-player Q
+
+One `Q` input stopped at `044C:0300`, the pressed-action target associated with scan code `10` in the left-player key table. Before the handler ran, `[0F7C]=FF` allowed the action and `[0F1C]=7F` held the player's energy value.
+
+A breakpoint at `044C:0316`, immediately before the handler's follow-up call, captured the bounded state change:
+
+| State | Before `044C:0300` | At `044C:0316` |
+|---|---:|---:|
+| Energy `[0F1C]` | `7F` | `7E` |
+| Phaser state `[0F7C]` | `FF` | `18` |
+
+This confirms that the Q path spends one energy unit, arms a timed phaser state, and then calls a separate follow-up routine at `044C:2006`.
+
+### Structural comparison
+
+Both keys use the shared scan-code table and compact foreground dispatcher described in Phase 2, but they branch into distinct leaf handlers. Movement writes a transient command for later timer consumption, while the phaser action performs an immediate resource/state transition before calling a dedicated follow-up routine. This strengthens the proposed split between foreground input dispatch and interrupt-driven simulation.
+
+## P3-09 immediate exit and cropped-image validation
+
+One F1 input at the frontend stopped at `044C:0095`, confirming the direct shutdown target proposed in Phase 2. Before restoration, interrupt-vector memory contained:
+
+| Vector | Bytes | Handler |
+|---|---|---|
+| 8 | `2D 17 4C 04` | Frontend timer `044C:172D` |
+| 9 | `80 1F 4C 04` | Game keyboard `044C:1F80` |
+
+The next breakpoint stopped at `044C:1EE2`, the routine that restores both vectors and writes the default divisor to PIT channel 0. A bounded stop at `044C:1F13`, immediately before the routine returned, showed:
+
+| Vector | Bytes | Restored handler |
+|---|---|---|
+| 8 | `A5 FE 00 F0` | `F000:FEA5` |
+| 9 | `87 E9 00 F0` | `F000:E987` |
+
+After the final resume, execution continued through the mapped saved-stack and video-restoration sequence, returned through the DOS termination path, and the emulator session closed normally.
+
+Only narrow original-resolution crops were inspected by the model. They preserved exact debugger glyphs while excluding unrelated terminal content. The command-line crop caught incomplete synthetic input before Enter on two occasions, while output, breakpoint-list, register, code, and data crops supplied sufficient evidence without OCR or full-window inspection. The approach reduced irrelevant visual context and improved correctness, although character-by-character synthetic input was slower than batched typing.
+
 ## Expected address correlations
 
-These remain hypotheses until P3-05 through P3-07 are complete:
+The following runtime correlations have now been confirmed:
 
 | Runtime code offset | Proposed role | Dynamic confirmation |
 |---|---|---|
@@ -129,8 +197,14 @@ These remain hypotheses until P3-05 through P3-07 are complete:
 | `172D` | Frontend timer handler | Confirmed at `044C:172D`; interrupt vector 8 contains `2D 17 4C 04` |
 | `00BC` | Game entry | Confirmed at `044C:00BC` after exactly one F2 keypress |
 | `233D` | Game timer handler | Confirmed at `044C:233D`; interrupt vector 8 contains `3D 23 4C 04` |
-| `1F80` | Keyboard handler | Reserve for the later single-input experiments |
+| `1F80` | Keyboard handler | Persistent vector confirmed; post-store point `044C:1F95` distinguishes queued make/break events by scan code |
+| `02B6` | Left-player rotate counter-clockwise | Confirmed after one `A` input |
+| `0300` | Left-player phaser action | Confirmed after one `Q` input |
+| `0316` | Phaser follow-up call site | Confirmed after energy changed `7F` to `7E` and phaser state changed `FF` to `18` |
+| `0095` | Shutdown and exit | Confirmed after one F1 input at the frontend |
+| `1EE2` | Restore vectors and PIT | Confirmed on the shutdown path before restoration |
+| `1F13` | Restoration return | Confirmed after vectors 8 and 9 changed back to their saved handlers |
 
 ## Phase gate
 
-Do not begin Phase 4 yet. Phase 3 should first complete the two single-input experiments. If the lightweight debugger behaves differently in a normal terminal, record the exact command and observed state in this document without adding host or package-version details.
+The planned Phase 3 gate is satisfied. Do not begin Phase 4 automatically: first review these findings and agree the Phase 4 scope. Any later runtime trace should answer a specific new question and remain explicitly bounded.
