@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 4 is in progress. The approved pinned container is validated, and P4-02 imported the ignored working executable without automatic analysis. The MZ loader, 16-bit real-mode language, memory blocks, relocation addresses, entry point, and Phase 1/3 address conversions all agree. P4-03 is ready to transfer the reviewed static function map before broader automatic analysis.
+Phase 4 is in progress. The approved pinned container and P4-02 address model are validated. P4-03 transferred all exact high-confidence function-entry proposals into namespaced subsystem groups without automatic disassembly or function creation. P4-04 is ready to begin the focused random-generator analysis.
 
 ## Task log
 
@@ -10,8 +10,8 @@ Phase 4 is in progress. The approved pinned container is validated, and P4-02 im
 |---|---|---|---|
 | P4-01 | Review the pinned Ghidra container setup | Select and record exact inputs, isolation, mounts, and storage before any download | Complete |
 | P4-02 | Import and reproduce address mappings | Confirm the MZ loader, 16-bit real-mode language, entry point, and Phase 1/3 address conversions | Complete |
-| P4-03 | Apply the static function map | Transfer high-confidence functions and subsystem boundaries from `analysis/function-ledger.csv` | Ready |
-| P4-04 | Recover random-number design | Express seeding, the five-byte recurrence, caller range mapping, and repeatability | Not started |
+| P4-03 | Apply the static function map | Transfer high-confidence functions and subsystem boundaries from `analysis/function-ledger.csv` | Complete |
+| P4-04 | Recover random-number design | Express seeding, the five-byte recurrence, caller range mapping, and repeatability | Ready |
 | P4-05 | Recover star and background generation | Explain frontend star initialization/animation and gameplay background placement | Not started |
 | P4-06 | Prepare the computer-player handoff | Identify decision entries, action leaves, state inputs, and random-number calls for Phase 5 | Not started |
 
@@ -124,6 +124,29 @@ All ten reported Ghidra locations were checked against eight bytes read independ
 Ghidra placed the five relocation records at `12AB:0007`, `12AB:0060`, `12AB:173B`, `12AB:1F85`, and `12AB:2347`. Subtracting the canonical code-segment base reproduces all five Phase 1 relocation offsets.
 
 The ignored raw reports are `analysis/ghidra/exports/p4-02-import-report.txt` and `analysis/ghidra/exports/p4-02-address-report.txt`. They are evidence aids, not publication artefacts.
+
+## P4-03 high-confidence function map
+
+The tracked function ledger contains 53 proposed entries: 44 `high`, eight `medium-high`, and one `medium`. P4-03 applied only the 44 exact `high` rows. The remaining nine rows were intentionally deferred rather than silently promoted.
+
+Each applied name is a user-defined label nested beneath two explicit namespaces:
+
+```text
+investigation::<subsystem>::<proposed-name>
+```
+
+For example, runtime `CS:28F2` is now labelled `investigation::math::next_random` at Ghidra `12AB:28F2`. The ten subsystem namespaces are `audio`, `control`, `frontend`, `gameplay`, `input`, `interrupts`, `math`, `platform`, `rendering`, and `state`.
+
+Every label has a plate comment containing the ledger's subsystem, exact confidence, and evidence. The `investigation` namespace and comment wording make clear that these are evidence-backed proposals, not recovered original symbols.
+
+This task did not run automatic analysis, disassemble instructions, or create Ghidra function objects. Keeping the entries as primary labels lets later focused disassembly adopt the reviewed names while avoiding premature flow-following through inline display data. The transfer script validated every relationship:
+
+```text
+load-module offset = 0x2AB0 + runtime CS offset
+Ghidra address      = 12AB:<runtime CS offset>
+```
+
+The ignored report `analysis/ghidra/exports/p4-03-ledger-report.txt` matches all 44 applied source rows exactly, confirms that each label is primary, confirms that no function object was created, and records nine deferred lower-confidence rows.
 
 ## Evidence and uncertainty policy
 

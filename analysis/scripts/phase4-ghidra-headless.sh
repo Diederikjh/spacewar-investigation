@@ -9,6 +9,7 @@ cd -- "$project_dir"
 
 image_name=${SPACEWAR_GHIDRA_IMAGE:-spacewar-ghidra:12.1.2}
 source_binary='analysis/work/Spacewar1985.exe'
+function_ledger='analysis/function-ledger.csv'
 script_store='analysis/ghidra-scripts'
 ghidra_dir='analysis/ghidra'
 project_store="$ghidra_dir/projects"
@@ -21,6 +22,7 @@ if (( $# == 0 )); then
 fi
 
 test -f "$source_binary"
+test -f "$function_ledger"
 test -d "$script_store"
 if ! command -v docker >/dev/null; then
     echo 'Docker is required to run the Phase 4 Ghidra image.' >&2
@@ -44,6 +46,7 @@ exec docker run \
     --user "$run_uid:$run_gid" \
     --env HOME=/work/home \
     --mount "type=bind,src=$project_dir/$source_binary,dst=/input/Spacewar1985.exe,readonly" \
+    --mount "type=bind,src=$project_dir/$function_ledger,dst=/input/function-ledger.csv,readonly" \
     --mount "type=bind,src=$project_dir/$script_store,dst=/scripts,readonly" \
     --mount "type=bind,src=$project_dir/$project_store,dst=/projects" \
     --mount "type=bind,src=$project_dir/$home_store,dst=/work/home" \
