@@ -21,6 +21,18 @@ LABEL org.opencontainers.image.title="Spacewar1985 Ghidra investigation environm
 
 COPY --from=extract /opt/ghidra /opt/ghidra
 
+# The JDK ZIP extractor does not restore Unix permission bits. Restore execute
+# permission deterministically for scripts and native ELF programs only.
+RUN set -eux; \
+    find /opt/ghidra -type f -exec sh -c '\
+        for file do \
+            magic=$(od -An -N4 -tx1 "$file" | tr -d " \\n"); \
+            case "$magic" in \
+                2321*|7f454c46) chmod 0755 "$file" ;; \
+            esac; \
+        done \
+    ' sh {} +
+
 WORKDIR /work
 
 CMD ["/opt/ghidra/support/analyzeHeadless"]

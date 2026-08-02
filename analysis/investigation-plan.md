@@ -26,7 +26,7 @@ The investigation aims to recover architectural intent and important data struct
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
 | 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
-| 4. Ghidra analysis | In progress | Pinned container validated; executable import and address mapping are next |
+| 4. Ghidra analysis | In progress | MZ import and address mapping confirmed; static function-map transfer is next |
 | 5. Computer-player behavior | Not started | Explain robot decisions and compare left/right behavior using static and bounded runtime evidence |
 | 6. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -129,7 +129,7 @@ Import according to the classification:
 ### Tasks
 
 - [x] Review and approve a pinned Docker-based Ghidra setup before downloading or importing anything.
-- [ ] Import the MZ executable as `x86:LE:16:Real Mode` and reproduce the Phase 1/Phase 3 address mappings.
+- [x] Import the MZ executable as `x86:LE:16:Real Mode` and reproduce the Phase 1/Phase 3 address mappings.
 - [ ] Apply the high-confidence function names and subsystem boundaries from `analysis/function-ledger.csv`.
 - [ ] Recover the five-byte random-generator state update at runtime offset `28F2` and express its additive/carry recurrence precisely.
 - [ ] Recover the BIOS-clock seed path at runtime offset `2916` and determine which state byte, if any, is not overwritten by the seed routine.
@@ -236,3 +236,4 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Added a dedicated post-Ghidra phase to explain computer-player decisions and compare left/right behavior with bounded, crop-validated debugger experiments where static evidence is insufficient.
 - Started Phase 4 by recording a pinned, headless Docker/Ghidra proposal in `analysis/phase-4-findings.md`; no image was downloaded and no executable was imported pending review.
 - Built the approved pinned Ghidra container, verified the official release archive against its published SHA-256, and passed the isolated dependency smoke test without mounting the executable.
+- Imported the ignored working executable without automatic analysis, confirmed Ghidra's MZ/16-bit real-mode model, and reproduced the Phase 1/Phase 3 address mappings with independent byte checks.
