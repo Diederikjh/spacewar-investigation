@@ -26,7 +26,7 @@ The investigation aims to recover architectural intent and important data struct
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
 | 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
-| 4. Ghidra analysis | Ready to start | Recover functions, call relationships, structures, pseudocode, and the star/random-number paths |
+| 4. Ghidra analysis | In progress | Container setup is under review before any image download or executable import |
 | 5. Computer-player behavior | Not started | Explain robot decisions and compare left/right behavior using static and bounded runtime evidence |
 | 6. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -234,3 +234,4 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Completed Phase 3 without producing a runtime dump or committing temporary screenshots.
 - Added starfield and random-generator reconstruction as an explicit Phase 4 investigation thread.
 - Added a dedicated post-Ghidra phase to explain computer-player decisions and compare left/right behavior with bounded, crop-validated debugger experiments where static evidence is insufficient.
+- Started Phase 4 by recording a pinned, headless Docker/Ghidra proposal in `analysis/phase-4-findings.md`; no image was downloaded and no executable was imported pending review.
