@@ -88,7 +88,7 @@ The original vectors are saved at startup. Shutdown restores both vectors and re
 The foreground path at `0x33F0` cycles through several screens and animations:
 
 - Title and copyright.
-- Animated 90-star field.
+- Animated 90-particle title effect; Phase 4 later established that its glyph tiles form `SPACEWAR`.
 - Player key assignments.
 - Game instructions.
 - User-supported distribution information.
@@ -146,7 +146,7 @@ This is a producer/consumer arrangement over shared state. The timer produces ne
 | DS range or base | Probable purpose |
 |---|---|
 | `0000..02AA` | Platform state and custom stack |
-| `038D` and related arrays | Frontend star positions and fixed-point motion |
+| `038D` and related arrays | Frontend title-particle positions and fixed-point motion |
 | `0950..0CAF` | Embedded initial game-state template |
 | `0CBC..101B` | Live copied game state |
 | `1080` | Shared 72.8 Hz tick byte |
@@ -196,7 +196,7 @@ Important techniques:
 - The world wraps at X `0x280` (640) and Y `0xC8` (200).
 - Ships and projectiles select bitmap frames from angle/state values.
 - A 16-frame planet renderer writes 32 scanlines directly.
-- The frontend starfield uses 90 fixed-point stars; the gameplay background draws 512 random pixels.
+- The frontend title effect uses 90 fixed-point glyph particles; the gameplay background draws 512 random pixels.
 
 ### Inline display data
 
@@ -218,7 +218,7 @@ Sound is produced through the PC speaker:
 - A small event/phase state machine selects different fixed, swept, alternating, or random frequencies.
 - F8 toggles the global sound-enabled byte.
 
-The random generator maintains a compact five-byte additive/carry state seeded from the BIOS clock. It supports star placement, hyperspace positions, robot choices, and randomized sound.
+The random generator maintains a compact five-byte additive/carry state seeded from the BIOS clock. It supports title and round-end particle velocities, background and hyperspace coordinates, robot choices, and randomized sound.
 
 ## Compiler and source-style assessment
 

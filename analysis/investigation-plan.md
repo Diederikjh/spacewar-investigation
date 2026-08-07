@@ -26,7 +26,7 @@ The investigation aims to recover architectural intent and important data struct
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
 | 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
-| 4. Ghidra analysis | In progress | Random-number design recovered; star/background generation is next |
+| 4. Ghidra analysis | In progress | Random and title/background designs recovered; computer-player handoff is next |
 | 5. Computer-player behavior | Not started | Explain robot decisions and compare left/right behavior using static and bounded runtime evidence |
 | 6. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -133,9 +133,9 @@ Import according to the classification:
 - [x] Apply the high-confidence function names and subsystem boundaries from `analysis/function-ledger.csv`.
 - [x] Recover the five-byte random-generator state update at runtime offset `28F2` and express its additive/carry recurrence precisely.
 - [x] Recover the BIOS-clock seed path at runtime offset `2916` and determine which state byte, if any, is not overwritten by the seed routine.
-- [ ] Explain how the 90-star frontend field initializes positions, calculates signed fixed-point velocities, advances stars, and chooses rendered glyphs.
+- [x] Explain how the 90-tile `SPACEWAR` frontend title initializes positions, calculates signed fixed-point velocities, advances particles, and chooses rendered glyphs.
 - [x] Explain how the 512-pixel gameplay background obtains X/Y coordinates, including masking, rejection ranges, and resulting coordinate distribution.
-- [x] Compare the star consumers with hyperspace, robot, and randomized-sound consumers to distinguish shared generator behavior from caller-specific range mapping.
+- [x] Compare the particle consumers with hyperspace, robot, and randomized-sound consumers to distinguish shared generator behavior from caller-specific range mapping.
 - [x] Assess repeatability: identify which initial state and BIOS tick values would reproduce an identical star layout or animation.
 - [ ] Identify the exact computer-player decision entry points, action leaves, state inputs, and random-generator calls required by Phase 5.
 - [ ] Record the evidence, proposed types, remaining uncertainties, and confidence in `analysis/phase-4-findings.md`.
@@ -253,3 +253,5 @@ For each candidate path, record its preconditions, event order, involved routine
 - Mapped coordinate rejection, background distribution, and the distinct robot, hyperspace, star, and sound interpretations of shared random output.
 - Added a deterministic executable model with carry-sensitive and coordinate-rejection assertions.
 - Added an architecture-phase task to identify any reproducible crash path and recover its minimal causal event sequence.
+- Refined the apparent frontend starfield into a 90-tile `SPACEWAR` title that disperses and exactly reassembles through negated fixed-point velocities.
+- Identified a separate 90-pixel round-end effect that reuses the title's mutable arrays and a third unstored 512-pixel background system.

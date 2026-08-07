@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 4 is in progress. The approved pinned container and P4-02 address model are validated. P4-03 transferred all exact high-confidence function-entry proposals into namespaced subsystem groups without automatic disassembly or function creation. P4-04 recovered the random-generator design; star and background generation are next.
+Phase 4 is in progress. The approved pinned container and P4-02 address model are validated. P4-03 transferred all exact high-confidence function-entry proposals into namespaced subsystem groups without automatic disassembly or function creation. P4-04 recovered the random-generator design, and P4-05 recovered the title-particle and background design; the computer-player handoff is next.
 
 ## Task log
 
@@ -12,8 +12,8 @@ Phase 4 is in progress. The approved pinned container and P4-02 address model ar
 | P4-02 | Import and reproduce address mappings | Confirm the MZ loader, 16-bit real-mode language, entry point, and Phase 1/3 address conversions | Complete |
 | P4-03 | Apply the static function map | Transfer high-confidence functions and subsystem boundaries from `analysis/function-ledger.csv` | Complete |
 | P4-04 | Recover random-number design | Express seeding, the five-byte recurrence, caller range mapping, and repeatability | Complete |
-| P4-05 | Recover star and background generation | Explain frontend star initialization/animation and gameplay background placement | Ready |
-| P4-06 | Prepare the computer-player handoff | Identify decision entries, action leaves, state inputs, and random-number calls for Phase 5 | Not started |
+| P4-05 | Recover star and background generation | Explain frontend star initialization/animation and gameplay background placement | Complete |
+| P4-06 | Prepare the computer-player handoff | Identify decision entries, action leaves, state inputs, and random-number calls for Phase 5 | Ready |
 
 ## P4-01 validated container setup
 
@@ -197,7 +197,7 @@ q4 = unchanged
 
 The image initializes scratch and all five active bytes to zero, so `q4` is zero when a fresh process reaches the seed routine. Identical BIOS tick values therefore produce identical initial states and output streams on fresh launches. A later reseed would retain the then-current `q4`, but no later direct seed call exists.
 
-Repeatability after startup also depends on call order because all consumers share this state. The first frontend background consumes a variable number of values before the 90 frontend stars receive their velocities. The star positions themselves are copied from embedded tables, while their velocities are generated. Thus an identical fresh seed and identical control path reproduce both the background and animation; reproducing a later game background additionally requires the same intervening random-call history. A saved full five-byte state at a named call boundary is sufficient for a focused mid-session comparison.
+Repeatability after startup also depends on call order because all consumers share this state. The first frontend background consumes a variable number of values before the 90 frontend title particles receive their velocities. The particle positions themselves are copied from embedded tables, while their velocities are generated. Thus an identical fresh seed and identical control path reproduce both the background and animation; reproducing a later game background additionally requires the same intervening random-call history. A saved full five-byte state at a named call boundary is sufficient for a focused mid-session comparison.
 
 ### Coordinate adapters and background distribution
 
@@ -224,7 +224,7 @@ The direct consumers do not use one universal range operation. They interpret ra
 | Right hyperspace | `CS:0763`, `CS:077E` | Uses the same X and Y coordinate helpers |
 | Round-end effects | `CS:087F`, `CS:08D3`, `CS:08DA` | Uses one bit from `AH` for sound and raw words for two star-velocity components |
 | Frontend background | `CS:0956` | Draws 512 pixels through the coordinate helpers |
-| Frontend star velocities | `CS:0A48`, `CS:0A51` | Arithmetic-shifts each raw word right once before storing signed X/Y velocity components |
+| Frontend title-particle velocities | `CS:0A48`, `CS:0A51` | Arithmetic-shifts each raw word right once before storing signed X/Y velocity components |
 | Game background | `CS:1F3C` | Draws another 512 pixels through the coordinate helpers |
 | Randomized speaker divisor | `CS:289A` | ORs raw `AX` with `0x2000` before programming PIT channel 2 |
 
@@ -235,8 +235,111 @@ The shared generator is therefore a small service with deliberately thin caller-
 - Confidence is high in the storage layout, recurrence, return value, seed mapping, masks, rejection bounds, and direct-call inventory because each is encoded directly in the validated bytes.
 - Confidence is high that a fresh launch with the same BIOS tick reproduces the initial stream because the retained state byte is initially zero and there is one direct seed call.
 - The generator period and statistical quality have not been established; neither is needed to explain the code design or deterministic reproduction.
-- Detailed 90-star position, fixed-point animation, and glyph behavior remain P4-05.
+- Detailed 90-particle position, fixed-point animation, and glyph behavior are addressed in P4-05 below.
 - The semantic reason for the left/right robot draw-count difference remains deliberately deferred to P4-06 and Phase 5.
+
+## P4-05 title particles and backgrounds
+
+### Evidence boundary and refined interpretation
+
+The focused Ghidra export covered nine bounded routines, all nine 90-word particle arrays, the five selected 16-by-8 glyphs, and 21 reviewed direct calls. A byte-level sweep found exactly the same 21 direct-call candidates into the focused routines. The ignored report `analysis/ghidra/exports/p4-05-star-report.txt` contains the bounded bytes, complete 90-entry template, glyph bytes, a downsampled preview, and call validation; `analysis/ghidra-scripts/ExportStarDesign.java` reproduces it.
+
+The earlier `starfield` and `xor_star` proposals remain useful navigation names, but P4-05 refines their meaning. The frontend object is a 90-tile animated title: its fixed template and five edge glyphs visibly form `SPACEWAR`. It is distinct from both the 512-pixel background and the later 90-pixel round-end effect.
+
+### Nine parallel particle arrays
+
+The title and round-end effects share a compact structure-of-arrays block. Each array contains 90 words, occupies `0xB4` bytes, and is selected with the same even byte index `SI=0..0xB2`.
+
+| Initialized `DS:` base | Role | Image state |
+|---:|---|---|
+| `0171` | 16-by-8 glyph selector | Fixed template values `0x0E..0x12` |
+| `0225` | Initial X integer | Fixed title template |
+| `02D9` | Initial Y integer | Fixed title template |
+| `038D` | Current X integer | Zero until initialized |
+| `0441` | Current Y integer | Zero until initialized |
+| `04F5` | Current X fractional word | Zero |
+| `05A9` | Current Y fractional word | Zero |
+| `065D` | Signed X velocity | Zero until generated |
+| `0711` | Signed Y velocity | Zero until generated |
+
+The mutable coordinate representation is 16.16 fixed point:
+
+```text
+X = (current_x_integer << 16) | current_x_fraction
+Y = (current_y_integer << 16) | current_y_fraction
+```
+
+The code updates the low fractional word with `ADD` and the high integer word with sign extension plus `ADC`. This is the same split-word arithmetic style used by live game entities, but the particle arrays are separate from the entity arrays.
+
+### Fixed `SPACEWAR` title template
+
+Runtime `CS:0A1C` loops over all 90 entries. It copies the fixed X/Y templates into the current integer arrays, clears both fractional words, and XOR-draws each tile once.
+
+All 90 positions are unique. Tile origins use a 16-pixel X grid from `64` through `560` and an 8-pixel Y grid from `80` through `112`. Because each tile is 16 by 8 pixels, the assembled title occupies X `64..575` and Y `80..119`, centered within the `640 x 200` display.
+
+The selector counts are:
+
+| Selector | Count | Shape role |
+|---:|---:|---|
+| `0x0E` | 47 | Solid 16-by-8 tile |
+| `0x0F` | 11 | Wedge expanding toward one side |
+| `0x10` | 6 | Mirrored expanding wedge |
+| `0x11` | 19 | Wedge contracting toward one side |
+| `0x12` | 7 | Mirrored contracting wedge |
+
+Runtime `CS:1CB7` reads the current integer X/Y, shifts the selector left four bits to select a 16-byte glyph beneath `DS:22A0`, and invokes the eight-row XOR sprite renderer. These solid and diagonal-edge tiles combine to form the large `SPACEWAR` lettering without storing a conventional full-screen title bitmap.
+
+### Disperse-and-reassemble animation
+
+Runtime `CS:0A43` consumes two generator values per tile, 180 calls total. Each returned 16-bit word is arithmetic-shifted right once and stored as a signed velocity, giving the exact range `-16384..16383`.
+
+Runtime `CS:0A87` renders 30 foreground frames. For every tile in every frame it:
+
+1. checks the shared pause state;
+2. XOR-erases the tile at its old position;
+3. sign-extends each velocity, shifts it left three bits, and adds it to the corresponding 16.16 position;
+4. XOR-draws the tile at its new position.
+
+Thus each frame applies:
+
+```text
+X' = X + (signed_x_velocity << 3)
+Y' = Y + (signed_y_velocity << 3)
+```
+
+This is at most two pixels of movement per axis per frame. Across 30 frames, the fixed title margins keep every 16-by-8 tile on screen, so this frontend routine needs no wrap or clipping branch.
+
+The velocity initializer waits, runs one 30-frame outward animation, negates all 180 velocity components, and returns. Its frontend caller immediately invokes the same 30-frame animation again. Equal step counts with exactly negated velocities return every 32-bit fixed-point position to its starting value, reassembling the title without saving a second position snapshot.
+
+The animation is foreground work rather than timer-driven work. Its only per-tile synchronization call waits while paused; the separate delay wrapper provides the longer holds between frontend displays.
+
+### Round-end reuse of the mutable arrays
+
+The round-end path at runtime `CS:07FC` reuses the six mutable position, fraction, and velocity arrays but not the fixed title positions or glyph selectors. Runtime `CS:08B4` places all 90 particles at one selected ship's previous rendered position, clears their fractional words, and stores two raw random words as signed velocities.
+
+For 128 frames the round-end loop XOR-erases and redraws each particle as one pixel. It adds the signed 16-bit velocity directly to the 16.16 coordinate without the frontend's left shift, then wraps integer X at `640` and integer Y at `200`. A final 90-pixel XOR pass removes the effect. This produces a slower point-particle burst while reusing the same storage allocated for the title animation.
+
+### Persistent random backgrounds
+
+The 512-pixel background at runtime `CS:2932` is a third system. It does not use or populate any particle array. It obtains one accepted X/Y pair, immediately XORs that pixel into CGA memory, and repeats 512 times.
+
+The frontend calls it at `CS:0956` after clearing the framebuffer. Game initialization calls it again at `CS:1F3C`, also after a clear and before status elements are drawn. The points then persist because their coordinates are not retained for movement or later erasure. As established in P4-04, duplicate coordinates are possible and XOR parity determines whether a multiply selected point remains visible.
+
+| Property | Frontend title | Round-end effect | Random background |
+|---|---|---|---|
+| Elements | 90 glyph tiles | 90 pixels | 512 draw attempts |
+| Stored coordinates | Shared six mutable arrays | Same six arrays reused | None |
+| Initial geometry | Fixed `SPACEWAR` template | One ship position | Random accepted X/Y |
+| Motion | 30 frames out, 30 back | 128 wrapped frames | None |
+| Renderer | 16-by-8 XOR glyph | XOR pixel | XOR pixel |
+| Boundary policy | Margins make wrapping unnecessary | Wrap `640 x 200` | Reject outer eight-pixel border |
+
+### Confidence and handoff
+
+- Confidence is high in the array layout, fixed-point formulas, frame counts, glyph dimensions, title reconstruction, velocity transformations, and background distinction because they follow directly from validated bytes and data.
+- The ignored preview independently reconstructs readable `SPACEWAR` lettering from the fixed positions and glyph data; no screenshot interpretation is required.
+- No debugger run is needed for P4-05. Timing in wall-clock terms remains emulator-speed dependent because the foreground animation is not paced by the custom timer.
+- P4-06 can now treat the particle arrays as unrelated scratch/state storage when mapping computer-player inputs, avoiding confusion with the live entity arrays.
 
 ## Evidence and uncertainty policy
 
