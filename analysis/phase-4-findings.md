@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 4 is in progress. The approved pinned container and P4-02 address model are validated. P4-03 transferred all exact high-confidence function-entry proposals into namespaced subsystem groups without automatic disassembly or function creation. P4-04 is ready to begin the focused random-generator analysis.
+Phase 4 is in progress. The approved pinned container and P4-02 address model are validated. P4-03 transferred all exact high-confidence function-entry proposals into namespaced subsystem groups without automatic disassembly or function creation. P4-04 recovered the random-generator design; star and background generation are next.
 
 ## Task log
 
@@ -11,8 +11,8 @@ Phase 4 is in progress. The approved pinned container and P4-02 address model ar
 | P4-01 | Review the pinned Ghidra container setup | Select and record exact inputs, isolation, mounts, and storage before any download | Complete |
 | P4-02 | Import and reproduce address mappings | Confirm the MZ loader, 16-bit real-mode language, entry point, and Phase 1/3 address conversions | Complete |
 | P4-03 | Apply the static function map | Transfer high-confidence functions and subsystem boundaries from `analysis/function-ledger.csv` | Complete |
-| P4-04 | Recover random-number design | Express seeding, the five-byte recurrence, caller range mapping, and repeatability | Ready |
-| P4-05 | Recover star and background generation | Explain frontend star initialization/animation and gameplay background placement | Not started |
+| P4-04 | Recover random-number design | Express seeding, the five-byte recurrence, caller range mapping, and repeatability | Complete |
+| P4-05 | Recover star and background generation | Explain frontend star initialization/animation and gameplay background placement | Ready |
 | P4-06 | Prepare the computer-player handoff | Identify decision entries, action leaves, state inputs, and random-number calls for Phase 5 | Not started |
 
 ## P4-01 validated container setup
@@ -147,6 +147,96 @@ Ghidra address      = 12AB:<runtime CS offset>
 ```
 
 The ignored report `analysis/ghidra/exports/p4-03-ledger-report.txt` matches all 44 applied source rows exactly, confirms that each label is primary, confirms that no function object was created, and records nine deferred lower-confidence rows.
+
+## P4-04 random-number design
+
+### Evidence boundary
+
+The focused Ghidra export covered only the five routines at runtime `CS:28D0..2948`, the six storage bytes at initialized `DS:2AA0..2AA5`, and reviewed direct call sites. It validated 22 near-call opcodes and their relative targets. A byte-level sweep found exactly the same 22 direct-call candidates into the five focused routines, so the reviewed direct-call list is complete.
+
+The ignored raw report is `analysis/ghidra/exports/p4-04-random-report.txt`. The tracked `analysis/ghidra-scripts/ExportRandomDesign.java` reproduces its bounded byte and call checks. No automatic analysis, function creation, decompiler inference, or debugger run was needed.
+
+### Five-byte state and recurrence
+
+The active state is five bytes at initialized `DS:2AA1..2AA5`. The preceding byte at `DS:2AA0` is scratch space for the newly calculated byte. Let the pre-call active state be `(q0, q1, q2, q3, q4)`, in ascending address order.
+
+```text
+first = q0 + q3 + 1
+carry = 1 if first exceeds 0xFF, otherwise 0
+new   = ((first & 0xFF) + q4 + carry) & 0xFF
+
+state' = (new, q0, q1, q2, q3)
+AX     = (q0 << 8) | new
+```
+
+The initial `+1` comes from `STC` before the first `ADC`. The carry from that addition is then consumed by the second `ADC`; its final carry is discarded. This is not always equivalent to adding `q0 + q3 + q4 + 1` modulo 256. For example, state `FF 00 00 FF 00` produces new byte `00`, return value `FF00`, and next state `00 FF 00 00 FF`.
+
+The copy loop first writes the calculated byte to scratch `2AA0`, then copies `2AA4..2AA0` upward into `2AA5..2AA1`. On return, `AL` still contains the new byte and `AH` is reloaded from `2AA2`, which now contains the previous `q0`.
+
+The executable model in `analysis/scripts/phase4-random-model.py` preserves both carry stages and contains deterministic assertions. With BIOS tick value `0x12345678` and the retained byte zero, its first results are:
+
+| Step | Returned `AX` | Next active state |
+|---:|---:|---|
+| Seed | — | `78 56 34 12 00` |
+| 1 | `788B` | `8B 78 56 34 12` |
+| 2 | `8BD2` | `D2 8B 78 56 34` |
+| 3 | `D25E` | `5E D2 8B 78 56` |
+| 4 | `5E2D` | `2D 5E D2 8B 78` |
+
+### BIOS-clock seed and repeatability
+
+The startup call at runtime `CS:008A` invokes the only direct seed call, `CS:2916`. That routine reads the BIOS tick dword from `0040:006C` and copies it little-endian into the first four active bytes:
+
+```text
+q0 = tick bits  0..7
+q1 = tick bits  8..15
+q2 = tick bits 16..23
+q3 = tick bits 24..31
+q4 = unchanged
+```
+
+The image initializes scratch and all five active bytes to zero, so `q4` is zero when a fresh process reaches the seed routine. Identical BIOS tick values therefore produce identical initial states and output streams on fresh launches. A later reseed would retain the then-current `q4`, but no later direct seed call exists.
+
+Repeatability after startup also depends on call order because all consumers share this state. The first frontend background consumes a variable number of values before the 90 frontend stars receive their velocities. The star positions themselves are copied from embedded tables, while their velocities are generated. Thus an identical fresh seed and identical control path reproduce both the background and animation; reproducing a later game background additionally requires the same intervening random-call history. A saved full five-byte state at a named call boundary is sufficient for a focused mid-session comparison.
+
+### Coordinate adapters and background distribution
+
+The generator returns a 16-bit value, while the coordinate helpers apply their own masks and rejection intervals:
+
+| Helper | Candidate | Accepted coordinates | Count |
+|---|---|---|---:|
+| `CS:28D0` X | `AX & 03FF` | `8..631` | 624 |
+| `CS:28E1` Y | `AX & 01FF` | `8..191` | 184 |
+
+Each helper retries until its candidate lies in the half-open accepted interval. If the masked values were uniform, one X result would require about `1024 / 624 = 1.64` generator calls and one Y result about `512 / 184 = 2.78`; these are conditional expectations, not a claim that this generator is statistically uniform.
+
+Runtime `CS:2932` draws 512 pixels. For every pixel it obtains X, then Y, then calls the XOR pixel routine. Coordinates are therefore selected with replacement from the `624 x 184` interior. Duplicate coordinates are possible; because drawing uses XOR, an even number of hits at one coordinate leaves that pixel clear.
+
+### Shared generator, caller-specific interpretation
+
+The direct consumers do not use one universal range operation. They interpret raw bytes, words, or the coordinate adapters according to their own purpose:
+
+| Consumer | Runtime call sites | Interpretation |
+|---|---|---|
+| Left robot decisions | `CS:0484`, `CS:0494` | Tests raw `AL < 0x10`, then separately tests `(AX & 0x03FF) == 0` |
+| Right robot decisions | `CS:06B0`, `CS:06C0`, `CS:06E4` | Tests raw `AL < 0x10`, raw `AL < 0x08`, then `(AX & 0x03FF) == 0`; the extra right-side draw is a Phase 5 handoff question |
+| Left hyperspace | `CS:0700`, `CS:071B` | Uses the rejecting X and Y coordinate helpers |
+| Right hyperspace | `CS:0763`, `CS:077E` | Uses the same X and Y coordinate helpers |
+| Round-end effects | `CS:087F`, `CS:08D3`, `CS:08DA` | Uses one bit from `AH` for sound and raw words for two star-velocity components |
+| Frontend background | `CS:0956` | Draws 512 pixels through the coordinate helpers |
+| Frontend star velocities | `CS:0A48`, `CS:0A51` | Arithmetic-shifts each raw word right once before storing signed X/Y velocity components |
+| Game background | `CS:1F3C` | Draws another 512 pixels through the coordinate helpers |
+| Randomized speaker divisor | `CS:289A` | ORs raw `AX` with `0x2000` before programming PIT channel 2 |
+
+The shared generator is therefore a small service with deliberately thin caller-side mapping. Hyperspace and background placement share the bounded coordinate policy; stars, robot choices, and sound consume different portions of the raw result. The unequal robot call patterns are recorded here without assigning gameplay intent before P4-06 and Phase 5 inspect their surrounding decisions.
+
+### Confidence and remaining questions
+
+- Confidence is high in the storage layout, recurrence, return value, seed mapping, masks, rejection bounds, and direct-call inventory because each is encoded directly in the validated bytes.
+- Confidence is high that a fresh launch with the same BIOS tick reproduces the initial stream because the retained state byte is initially zero and there is one direct seed call.
+- The generator period and statistical quality have not been established; neither is needed to explain the code design or deterministic reproduction.
+- Detailed 90-star position, fixed-point animation, and glyph behavior remain P4-05.
+- The semantic reason for the left/right robot draw-count difference remains deliberately deferred to P4-06 and Phase 5.
 
 ## Evidence and uncertainty policy
 

@@ -26,7 +26,7 @@ The investigation aims to recover architectural intent and important data struct
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
 | 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
-| 4. Ghidra analysis | In progress | High-confidence function map transferred; random-generator analysis is next |
+| 4. Ghidra analysis | In progress | Random-number design recovered; star/background generation is next |
 | 5. Computer-player behavior | Not started | Explain robot decisions and compare left/right behavior using static and bounded runtime evidence |
 | 6. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -131,12 +131,12 @@ Import according to the classification:
 - [x] Review and approve a pinned Docker-based Ghidra setup before downloading or importing anything.
 - [x] Import the MZ executable as `x86:LE:16:Real Mode` and reproduce the Phase 1/Phase 3 address mappings.
 - [x] Apply the high-confidence function names and subsystem boundaries from `analysis/function-ledger.csv`.
-- [ ] Recover the five-byte random-generator state update at runtime offset `28F2` and express its additive/carry recurrence precisely.
-- [ ] Recover the BIOS-clock seed path at runtime offset `2916` and determine which state byte, if any, is not overwritten by the seed routine.
+- [x] Recover the five-byte random-generator state update at runtime offset `28F2` and express its additive/carry recurrence precisely.
+- [x] Recover the BIOS-clock seed path at runtime offset `2916` and determine which state byte, if any, is not overwritten by the seed routine.
 - [ ] Explain how the 90-star frontend field initializes positions, calculates signed fixed-point velocities, advances stars, and chooses rendered glyphs.
-- [ ] Explain how the 512-pixel gameplay background obtains X/Y coordinates, including masking, rejection ranges, and resulting coordinate distribution.
-- [ ] Compare the star consumers with hyperspace, robot, and randomized-sound consumers to distinguish shared generator behavior from caller-specific range mapping.
-- [ ] Assess repeatability: identify which initial state and BIOS tick values would reproduce an identical star layout or animation.
+- [x] Explain how the 512-pixel gameplay background obtains X/Y coordinates, including masking, rejection ranges, and resulting coordinate distribution.
+- [x] Compare the star consumers with hyperspace, robot, and randomized-sound consumers to distinguish shared generator behavior from caller-specific range mapping.
+- [x] Assess repeatability: identify which initial state and BIOS tick values would reproduce an identical star layout or animation.
 - [ ] Identify the exact computer-player decision entry points, action leaves, state inputs, and random-generator calls required by Phase 5.
 - [ ] Record the evidence, proposed types, remaining uncertainties, and confidence in `analysis/phase-4-findings.md`.
 
@@ -238,3 +238,11 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Built the approved pinned Ghidra container, verified the official release archive against its published SHA-256, and passed the isolated dependency smoke test without mounting the executable.
 - Imported the ignored working executable without automatic analysis, confirmed Ghidra's MZ/16-bit real-mode model, and reproduced the Phase 1/Phase 3 address mappings with independent byte checks.
 - Transferred all 44 exact high-confidence function-entry proposals into ten namespaced Ghidra subsystem groups while deferring all nine lower-confidence ledger rows.
+
+### 2026-08-07
+
+- Recovered the exact five-byte random recurrence, including the carry fed from the first `ADC` into the second.
+- Confirmed the BIOS tick seed mapping, the retained fifth byte, and fresh-launch repeatability conditions.
+- Validated all 22 direct calls into the focused random routines and found no additional direct-call candidates.
+- Mapped coordinate rejection, background distribution, and the distinct robot, hyperspace, star, and sound interpretations of shared random output.
+- Added a deterministic executable model with carry-sensitive and coordinate-rejection assertions.
