@@ -200,6 +200,12 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Hardware and DOS/BIOS dependencies.
 - Unknowns, competing interpretations, and confidence levels.
 
+### Failure-path question
+
+- [ ] Determine whether a reproducible game crash path exists and, if so, recover the minimal ordered series of gameplay, input, interrupt, timing, and state-transition events that causes it.
+
+For each candidate path, record its preconditions, event order, involved routines and shared state, last known valid state, observed failure signature, evidence, and confidence. Distinguish a game defect from a debugger, emulator, or unsupported-hardware failure. Begin with static evidence around interrupt/foreground coordination, non-local mode transitions and stack resets, entity and projectile bounds, resource exhaustion, and option changes. Use a bounded debugger experiment only for a specific remaining hypothesis, keep raw traces and run copies ignored, and do not modify the original executable.
+
 ## Progress log
 
 ### 2026-08-01
@@ -246,3 +252,4 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Validated all 22 direct calls into the focused random routines and found no additional direct-call candidates.
 - Mapped coordinate rejection, background distribution, and the distinct robot, hyperspace, star, and sound interpretations of shared random output.
 - Added a deterministic executable model with carry-sensitive and coordinate-rejection assertions.
+- Added an architecture-phase task to identify any reproducible crash path and recover its minimal causal event sequence.
