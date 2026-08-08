@@ -203,6 +203,138 @@ Rank 1 is the best first experiment: it changes one immediate byte, preserves th
 
 The random-threshold candidates scale accepted raw-value sets; their real event rates remain coupled to the generator sequence, foreground speed, timer phase, helper cooldowns, and shared-stream call order. A later proof of concept should therefore compare fixed-duration gameplay outcomes rather than assume the uniform reference fractions are measured probabilities.
 
+## Deferred follow-up: cloak-aware targeting
+
+### Investigation question and status
+
+Static analysis establishes that computer players currently target cloaked ships. Cloak is action-flag bit 1 at `DS:0EBC` for the left ship and `DS:0ECC` for the right ship. It suppresses normal ship rendering but does not hide coordinates or change the positive entity-state byte used by computer-player logic.
+
+This follow-up will investigate and prototype computer-player behavior that honours cloak after the overall architecture design has been captured and reviewed. It is deferred work, not part of the completed Phase 5 implementation, and no executable change has been made.
+
+### Recommended minimal semantics
+
+- A cloaked ship cannot be selected as a target.
+- Projectiles fired by a cloaked ship remain visible and targetable.
+- A computer player reacquires the ship on the first otherwise eligible foreground iteration after decloaking.
+- While its opponent is cloaked, the right robot retains its previous heading, continues energy and non-targeted movement decisions, and does not request phaser or photon fire.
+- Preserve the normal number of shared random-generator calls where practical so cloak does not unnecessarily shift random outcomes for other consumers.
+
+The projectile rule should be confirmed before implementation. Treating every projectile as hidden would permit a smaller left-side shortcut, but would make cloak conceal independent visible objects and materially change the recommended behavior.
+
+### Left and right implementation scope
+
+| Side | Current behavior | Required cloak-aware behavior | Relative effort |
+|---|---|---|---|
+| Left | Scans the right ship at slot `10`, then projectile slots `12..1E` | Test `DS:0ECC & 02`; when set, skip only slot `10` and continue scanning `12..1E` | Lower |
+| Right | Always reads the left coordinates and commits aim; when funded, it reaches its weapon gate | Test `DS:0EBC & 02`; when set, skip bearing and weapon selection but execute the approved blind movement/energy policy | Higher |
+
+The recommended right-side blind branch is:
+
+```text
+if left is cloaked:
+    balance right energy
+    retain the previous heading
+    make the normal random impulse decision
+    consume and discard the normal weapon random draw
+    release the photon latch
+    make the normal random hyperspace decision
+    return
+```
+
+The phaser release leaf is a no-op, so no corresponding phaser latch needs clearing. Consuming the discarded weapon draw retains the normal three-value right decision cadence and limits unrelated changes to the shared random stream.
+
+### Code-placement constraint
+
+The cloak test is logically small but does not fit as a one-byte constant modification. Both robot routines are tightly packed, and no safe in-image code cave has yet been validated. Future implementations are nevertheless not limited to same-size instruction replacement: the MZ image can expose its existing physical padding or be extended while retaining all current addresses.
+
+#### Current executable boundary
+
+| Property | Current value |
+|---|---:|
+| Physical file size | `0x5800` bytes |
+| Declared executable size | `0x5794` bytes |
+| Header size | `0x0200` bytes |
+| Declared load-module size | `0x5594` bytes |
+| Code-segment start in load module | `0x2AB0` |
+| Current last loaded code byte | `CS:2AE3` |
+| Physical zero padding after declared image | `0x006C` bytes (108) |
+| Minimum extra allocation | One paragraph (16 bytes) |
+| Maximum extra allocation | `0xFFFF` paragraphs |
+
+The 108 padding bytes are physically present but not loaded under the current header. They cannot hold executable code without changing the declared image boundary.
+
+#### Available strategies
+
+| Order | Strategy | Approximate capacity | Main advantage | Main constraint |
+|---:|---|---:|---|---|
+| 1 | Shorten or replace instructions in place | A few bytes per site | No loader or file-layout change | Fragile and unsuitable for substantial branching |
+| 2 | Use a validated internal code cave or unreachable routine | Unknown until audited | Existing addresses and header remain untouched | Space must be proven unreachable and free of inline data or indirect references |
+| 3 | Promote the existing physical padding into the MZ image | 108 bytes | No physical file growth; ordinary near control transfers remain available | Requires header and old-extra-allocation audits |
+| 4 | Append more code within the current code segment | Up to about `0xD51C` bytes from the present end | Large, contiguous extension without moving current content | File and MZ size fields grow; code must remain at or below `CS:FFFF` |
+| 5 | Add another logical code segment | Beyond the near-offset limit | Supports larger isolated additions | Requires far control transfers and possibly new relocation entries |
+| 6 | Add an overlay, companion loader, or linkable assembly reconstruction | Flexible | Suitable for extensive future development | Introduces a loader or large reconstruction project |
+
+The strategies are not mutually exclusive. A normal patch uses a three-byte near jump at an existing instruction boundary, executes added code elsewhere, replays any displaced instructions, and jumps back to a reviewed continuation point.
+
+#### Promoting the existing 108 bytes
+
+This is the preferred first option for the cloak-aware proof of concept if no safe internal cave exists. The current MZ header declares 44 pages with `0x0194` bytes used in the last page. The physical file is exactly 44 complete 512-byte pages. Declaring a complete final page would produce:
+
+```text
+declared executable size = 0x5800
+header size              = 0x0200
+load-module size         = 0x5600
+new loaded code range    = CS:2AE4..CS:2B4F
+```
+
+In conventional MZ encoding, the page count can remain `0x002C` while the final-page byte field changes from `0x0194` to zero, meaning the complete final page is used. The checksum should be regenerated or its treatment explicitly documented even though DOS loaders commonly do not enforce it.
+
+Before using this range, the implementation must prove that the program does not rely on the old minimum-extra-allocation bytes at the current image end as zeroed storage. After expansion, the guaranteed extra paragraph begins after the new image instead. Existing file offsets, relocation sites, entry values, data addresses, code addresses, and the custom stack remain unmoved because content is appended rather than inserted.
+
+Added code in this range can use near jumps and calls within the existing `CS`, and can continue to access current state through `DS`. It should avoid embedding absolute segment constants. If such constants are unavoidable, add and validate the corresponding MZ relocation entries.
+
+The cloak design is likely to fit in 108 bytes: it needs two entry hooks, a left-side slot-skip decision, and a right-side blind-policy branch. Exact assembled size and displaced-instruction handling must be established before treating the capacity as sufficient.
+
+#### Larger same-segment extension
+
+If 108 bytes are insufficient, the physical file can be extended and the MZ page-count and final-page fields recomputed. The current code ends at `CS:2AE3`, leaving `0xD51C` bytes before the 16-bit near-offset boundary at `CS:FFFF`. Staying within this range preserves ordinary near calls and jumps and avoids creating a new code segment.
+
+The implementation must verify:
+
+- the final appended offset remains representable in the current `CS`;
+- DOS can allocate the larger image plus its required extra paragraphs;
+- no program logic assumes the old image end;
+- new code and data have an explicit ownership map;
+- hooks begin on decoded instruction boundaries and replay displaced instructions;
+- all relative control-flow displacements and any new relocation entries are validated;
+- the MZ page count, last-page byte count, checksum policy, and published patch manifest agree; and
+- the original executable remains unchanged while all experiments use an ignored run copy.
+
+Only after this capacity is exhausted should another segment, overlay loader, or broader assembly reconstruction be considered. Those approaches materially change control transfers, relocation design, packaging, and regression scope.
+
+### Effort estimate
+
+| Work item | Estimated effort |
+|---|---:|
+| Confirm final cloak and projectile semantics | 0.5–1 hour |
+| Locate and validate code placement; design control transfers | 2–5 hours |
+| Implement both computer-player branches on an ignored run copy | 1–3 hours |
+| Extend the static validator and executable policy model | 1–2 hours |
+| Run bounded DOSBox comparisons and document results | 2–4 hours |
+| Expected total with a usable in-image location | Approximately 1–2 working days |
+
+If promoting the existing 108 bytes passes its audits, the work should remain near the lower end of the estimate. Appending beyond the physical file requires broader header, loading, relocation, and regression validation and could take 2–3 working days. A crude right-only early return would be faster but is not recommended because it can freeze behavior, preserve stale action flags, and shift shared random consumption.
+
+### Validation criteria
+
+1. Confirm an uncloaked baseline still aims and fires through the original action leaves.
+2. With the left ship cloaked, confirm the right robot does not commit a new bearing or reach phaser/photon action leaves.
+3. With the right ship cloaked, confirm the left robot skips slot `10` but can still select an active projectile in slots `12..1E`.
+4. Confirm both robots reacquire the opposing ship on the first otherwise eligible decision after decloaking.
+5. Confirm energy balance, impulse, hyperspace, cooldown, and photon-latch behavior match the approved blind policy.
+6. Compare random-generator call counts between visible and cloaked decisions and document every intentional difference.
+7. Keep the original executable unchanged; apply the proof of concept only to an ignored run copy and use bounded debugger breakpoints with the established cropped-input validation workflow.
+
 ## Runtime decision
 
 No Phase 5 debugger session was run. Static evidence settled every planned decision branch, state read, action leaf, call order, and constant. The executable model also demonstrated the wrap discrepancy without mutating runtime memory. A debugger run would currently repeat known control flow rather than resolve an ambiguity.

@@ -206,6 +206,24 @@ Correlate static and dynamic evidence into an architecture document covering:
 
 For each candidate path, record its preconditions, event order, involved routines and shared state, last known valid state, observed failure signature, evidence, and confidence. Distinguish a game defect from a debugger, emulator, or unsupported-hardware failure. Begin with static evidence around interrupt/foreground coordination, non-local mode transitions and stack resets, entity and projectile bounds, resource exhaustion, and option changes. Use a bounded debugger experiment only for a specific remaining hypothesis, keep raw traces and run copies ignored, and do not modify the original executable.
 
+## Post-design follow-up investigations
+
+Begin these only after the Phase 6 architecture document has been captured and reviewed.
+
+### Cloak-aware computer-player targeting
+
+- [ ] Confirm whether projectiles fired by a cloaked ship remain independently visible and targetable; the current recommendation is yes.
+- [ ] Evaluate code space in order: in-place reclamation, a proven internal cave, promotion of the existing 108-byte physical padding, then a larger same-segment append.
+- [ ] Before promoting the padding, prove the old end-of-image extra allocation is unused and validate the proposed `CS:2AE4..2B4F` ownership range.
+- [ ] If the file must grow, keep appended code within the current `CS` where practical and validate the page count, final-page bytes, checksum policy, allocation, hooks, relative branches, and relocations.
+- [ ] Make the left robot skip a cloaked right ship at slot `10` while retaining projectile scans at slots `12..1E`.
+- [ ] Define and implement the right robot's blind movement, energy, weapon-latch, and random-call behavior.
+- [ ] Extend the Phase 5 Ghidra validator and executable policy model before running the modified copy.
+- [ ] Apply any proof of concept only to an ignored run copy and verify cloak, decloak, visible-projectile, energy, action, and random-cadence criteria with bounded debugger experiments.
+- [ ] Record the final design, patch mapping, runtime evidence, limitations, and whether the estimated 1–2 working-day scope changed because MZ expansion was required.
+
+The investigation boundary, recommended semantics, implementation alternatives, effort estimate, and validation criteria are recorded in `analysis/phase-5-findings.md`.
+
 ## Progress log
 
 ### 2026-08-01
@@ -267,3 +285,5 @@ For each candidate path, record its preconditions, event order, involved routine
 - Added a 25-row state ledger and an executable bearing/decision model with deterministic edge-wrap assertions.
 - Ranked seven possible difficulty changes without modifying the original executable or an ignored run copy.
 - Applied the debugger gate and concluded that a run would not resolve any current static ambiguity.
+- Added cloak-aware computer-player targeting as a deferred post-design investigation with separate left/right behavior, code-placement constraints, an effort estimate, and bounded validation criteria.
+- Recorded six executable code-space strategies, including the exact 108-byte padding-promotion layout and the larger same-segment capacity available to future implementations.
