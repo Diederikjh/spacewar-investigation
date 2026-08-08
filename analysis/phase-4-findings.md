@@ -368,8 +368,8 @@ The human dispatch tables establish the same nine actions on both sides. They al
 |---|---:|---:|---|
 | Rotate clockwise | `CS:02AA` | `CS:0501` | Store rotation command `+2` |
 | Rotate counter-clockwise | `CS:02B6` | `CS:050D` | Store rotation command `-2` |
-| Weapon to shield | `CS:02C2` | `CS:0519` | Transfer one unit on every fourth shared tick |
-| Shield to weapon | `CS:02E1` | `CS:0538` | Transfer one unit on every fourth shared tick |
+| Weapon to shield | `CS:02C2` | `CS:0519` | Transfer one unit per invocation while the shared tick is divisible by four |
+| Shield to weapon | `CS:02E1` | `CS:0538` | Transfer one unit per invocation while the shared tick is divisible by four |
 | Phaser | `CS:0300` | `CS:0557` | Spend one weapon-energy unit and start phaser state `0x18` when allowed |
 | Photon | `CS:0320` | `CS:0577` | Allocate a free projectile when the latch permits |
 | Impulse | `CS:034E` | `CS:05A5` | Set action-flag bit 0 |
@@ -390,7 +390,7 @@ The robot code accesses the following initialized-data fields. Left uses entity 
 | `0D3C` / `0D4C` | `uint16` left/right Y integer position | Threat or opponent delta |
 | `0E1C` / `0E2C` | `uint8` render-dirty state | Set after direct aim change |
 | `0E3C` / `0E4C` | signed byte entity active/type arrays | Ship and projectile eligibility |
-| `0E5C` / `0E6C` | `uint16` ship angle | Direct robot aim target |
+| `0E5C` / `0E6C` | `uint8` ship angle | Direct robot aim target |
 | `0E9C` / `0EAC` | signed byte rotation command | Cleared when robot commits aim |
 | `0EBC` / `0ECC` | `uint8` action flags | Bit 0 impulse; bit 1 cloak |
 | `0EDC` / `0EEC` | `uint8` action latches | Bit 0 photon; bit 1 hyperspace |
@@ -405,14 +405,14 @@ Velocity, planet/gravity state, and world-wrap flags are not direct robot inputs
 
 The left path at `CS:038E` first tries to balance shield and weapon energy toward equality. If weapon energy is zero it disables impulse, takes the phaser release path, and returns.
 
-It then scans right-side projectile slots `10, 12, ... 1E`. A slot qualifies when its entity byte is active and non-negative and both raw absolute coordinate differences from the left ship are below `0x60`. It uses the first qualifying slot; distance does not use the world's wrapped shortest path. For a threat, the routine calculates a bearing, directly writes the left angle at `CS:046C`, marks the ship dirty, and invokes the phaser helper.
+It then scans the right-side entity slots `10, 12, ... 1E`. Slot `10` is the right ship; slots `12..1E` are its projectiles. A slot qualifies when its entity byte is active and non-negative and both raw absolute coordinate differences from the left ship are below `0x60`. It uses the first qualifying slot, so a nearby right ship has priority over every projectile and projectiles otherwise follow slot order. Distance does not use the world's wrapped shortest path. For a qualifying entity, the routine calculates a bearing, directly writes the left angle at `CS:046C`, marks the ship dirty, and invokes the phaser helper.
 
 The path finishes with two independent random decisions:
 
 - At `CS:0484`, raw `AL < 0x10` enables impulse; otherwise impulse is disabled.
 - At `CS:0494`, `(AX & 0x03FF) == 0` requests hyperspace; otherwise it releases the hyperspace latch.
 
-With no qualifying projectile it skips aim and phaser work but still reaches both random movement decisions. It never selects photon or cloak. This control flow supports the executable's own description of the left robot as defensive.
+With no qualifying entity it skips aim and phaser work but still reaches both random movement decisions. It never selects photon or cloak. This close-range response to the opposing ship and its projectiles supports the executable's own description of the left robot as defensive.
 
 ### Right offensive policy
 
@@ -430,7 +430,7 @@ The right robot always aims at the opposing ship, uses both weapon helpers, neve
 
 Both paths take absolute X/Y magnitudes, retain quadrant information, compare the two axes, form a 16-bit fixed-point ratio, and use the 32 thresholds at `DS:2250` to quantize a bearing. They then store that bearing directly rather than requesting gradual rotation. Neither path corrects coordinate deltas for the toroidal playfield, so a target just across an edge can appear far away or in the longer direction.
 
-The implementations share data layout, bearing machinery, energy balancing, movement probability, and hyperspace probability. Their principal difference is policy rather than simple mirroring: left targets the first nearby hostile projectile and fires phaser; right targets the opposing ship and probabilistically chooses phaser or photon according to axis-aligned proximity. The right-only weapon draw also advances the one shared random stream differently.
+The implementations share data layout, bearing machinery, energy balancing, movement probability, and hyperspace probability. Their principal difference is policy rather than simple mirroring: left fires phaser at the nearby opposing ship or, when the ship is not close, the first nearby opposing projectile; right always targets the opposing ship and probabilistically chooses phaser or photon according to axis-aligned proximity. The right-only weapon draw also advances the one shared random stream differently.
 
 ### Confidence and Phase 5 starting questions
 

@@ -27,7 +27,7 @@ The investigation aims to recover architectural intent and important data struct
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
 | 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
 | 4. Ghidra analysis | Complete | Random, title/background, and computer-player handoff designs recovered in `phase-4-findings.md` |
-| 5. Computer-player behavior | Not started | Explain robot decisions and compare left/right behavior using static and bounded runtime evidence |
+| 5. Computer-player behavior | Complete | Normalized policies, asymmetries, state ledger, executable model, and ranked difficulty changes recorded in `phase-5-findings.md` |
 | 6. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
 ## Findings-document convention
@@ -154,31 +154,31 @@ Phase 5 is gated on the Phase 4 function and data map. The game calls its comput
 
 ### Static tasks
 
-- [ ] Trace the F3/F4 frontend options into the left/right robot-mode flags and record the default state.
-- [ ] Recover the control-flow split between human and robot handling in the left routine at runtime offset `024F` and the right routine at `04A6`.
-- [ ] Identify every state input used by a robot decision: positions, wrapped distances, headings, velocity, energy, weapon/cooldown state, projectile threats, planet/gravity options, tick state, and random values.
-- [ ] Recover the decision ordering and conditions for rotation, thrust, phasers, photons, cloak, hyperspace, and energy-management actions.
-- [ ] Determine whether decisions are made every foreground iteration, on selected ticks, or through per-action cooldown/latch state.
-- [ ] Normalize left slot `00` and right slot `10` accesses, then classify code as shared, mechanically mirrored, or behaviorally different.
-- [ ] Compare constants, branch order, target selection, projectile-pool ranges, wraparound calculations, and random-number consumption between left and right.
-- [ ] Determine whether any observed asymmetry is intentional policy, data-layout adaptation, update-order bias, or an implementation defect.
+- [x] Trace the F3/F4 frontend options into the left/right robot-mode flags and record the default state.
+- [x] Recover the control-flow split between human and robot handling in the left routine at runtime offset `024F` and the right routine at `04A6`.
+- [x] Identify every state input used by a robot decision: positions, wrapped distances, headings, velocity, energy, weapon/cooldown state, projectile threats, planet/gravity options, tick state, and random values.
+- [x] Recover the decision ordering and conditions for rotation, thrust, phasers, photons, cloak, hyperspace, and energy-management actions.
+- [x] Determine whether decisions are made every foreground iteration, on selected ticks, or through per-action cooldown/latch state.
+- [x] Normalize left slot `00` and right slot `10` accesses, then classify code as shared, mechanically mirrored, or behaviorally different.
+- [x] Compare constants, branch order, target selection, projectile-pool ranges, wraparound calculations, and random-number consumption between left and right.
+- [x] Determine whether any observed asymmetry is intentional policy, data-layout adaptation, update-order bias, or an implementation defect.
 
 ### Difficulty sub-question
 
-- [ ] What minimal, explainable code or data modifications could make the computer player more difficult, and how would each modification affect left and right behavior?
+- [x] What minimal, explainable code or data modifications could make the computer player more difficult, and how would each modification affect left and right behavior?
 
 For each candidate, record the current behavior, exact decision or constant involved, proposed change, expected gameplay effect, left/right applicability, and risk of unintended behavior. Consider decision cadence, aiming and movement prediction, reaction thresholds, weapon selection, defensive responses, energy management, and reliance on randomness. Rank candidates by likely benefit and implementation risk. Do not modify the original executable; any later proof-of-concept change must be separately reviewed and applied only to an ignored run copy.
 
 ### Bounded runtime tasks
 
-- [ ] Use the debugger only for questions that remain ambiguous after Phase 4; do not begin with an unrestricted trace.
-- [ ] Run left-robot-only and right-robot-only experiments separately from fresh launches, keeping the other player and frontend options controlled.
-- [ ] Break at the confirmed robot decision entry and selected action leaves, stopping after one decision or another explicitly stated small bound.
-- [ ] Compare only the required state ranges before and after a decision, normalizing left/right entity indices and projectile pools.
-- [ ] If deterministic comparison is required, use the Phase 4 random-state model to establish equivalent seeds and mirrored initial geometry in the ignored guest run copy; record every intentional state change.
-- [ ] Use `LOGS` only at a confirmed decision breakpoint with an explicit instruction bound; keep any raw log ignored and summarize only the relevant branch evidence.
-- [ ] Validate every indirectly entered debugger command with the cropped-image workflow: verify the input line before Enter, acknowledgement after Enter, and exact breakpoints with `BPLIST` before F5.
-- [ ] Treat queued key-release events separately from robot decisions and identify them by scan code when a keyboard breakpoint is unavoidable.
+- [x] Apply the debugger gate: static evidence resolved the planned questions, so no unrestricted or bounded trace was run.
+- [x] Decide whether separate left-robot-only and right-robot-only runs are required: they are deferred until a gameplay measurement or proof of concept is approved.
+- [x] Decide whether decision-entry and action-leaf breakpoints are required: the exact aligned branches and calls were validated statically.
+- [x] Decide whether runtime state comparisons are required: the round template, normalized indices, state reads, and writes were validated statically.
+- [x] Decide whether deterministic runtime seeding is required: the executable policy model resolves the current geometry question without a run.
+- [x] Keep `LOGS` unused because no remaining question justifies an instruction trace.
+- [x] Preserve the cropped-image command workflow for any later approved proof-of-concept experiment.
+- [x] Avoid keyboard breakpoints and queued key events because Phase 5 required no debugger input.
 
 ### Outputs
 
@@ -256,4 +256,14 @@ For each candidate path, record its preconditions, event order, involved routine
 - Refined the apparent frontend starfield into a 90-tile `SPACEWAR` title that disperses and exactly reassembles through negated fixed-point velocities.
 - Identified a separate 90-pixel round-end effect that reuses the title's mutable arrays and a third unstored 512-pixel background system.
 - Completed Phase 4 with a validated computer-player handoff covering mode selection, action tables, state fields, bearing logic, and 28 instruction-aligned robot calls.
-- Established that the left robot is projectile-defensive while the right robot directly pursues the opposing ship, and recorded their different weapon and random-consumption policies for Phase 5.
+- Established that the left robot responds at close range to the opposing ship and its projectiles while the right robot directly pursues the opposing ship, and recorded their different weapon and random-consumption policies for Phase 5.
+
+### 2026-08-08
+
+- Completed Phase 5 with exact normalized pseudocode for the left proximity-defense and right pursuit policies.
+- Validated the initial player template, byte-sized angle convention, raw non-wrapped distance behavior, foreground call order, and decision constants.
+- Refined the left target scan to include the right ship at slot `10` before projectile slots `12..1E`.
+- Recorded shared, mirrored, data-layout-adapted, and genuinely different behaviors in `analysis/phase-5-findings.md`.
+- Added a 25-row state ledger and an executable bearing/decision model with deterministic edge-wrap assertions.
+- Ranked seven possible difficulty changes without modifying the original executable or an ignored run copy.
+- Applied the debugger gate and concluded that a run would not resolve any current static ambiguity.
