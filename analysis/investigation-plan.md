@@ -26,7 +26,7 @@ The investigation aims to recover architectural intent and important data struct
 | 1. Preserve and classify | Complete | Conventional unpacked 16-bit MZ; findings recorded in `phase-1-findings.md` |
 | 2. Lightweight static map | Complete | Static architecture and function ledger recorded in `phase-2-findings.md` and `function-ledger.csv` |
 | 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
-| 4. Ghidra analysis | In progress | Random and title/background designs recovered; computer-player handoff is next |
+| 4. Ghidra analysis | Complete | Random, title/background, and computer-player handoff designs recovered in `phase-4-findings.md` |
 | 5. Computer-player behavior | Not started | Explain robot decisions and compare left/right behavior using static and bounded runtime evidence |
 | 6. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
 
@@ -137,8 +137,8 @@ Import according to the classification:
 - [x] Explain how the 512-pixel gameplay background obtains X/Y coordinates, including masking, rejection ranges, and resulting coordinate distribution.
 - [x] Compare the particle consumers with hyperspace, robot, and randomized-sound consumers to distinguish shared generator behavior from caller-specific range mapping.
 - [x] Assess repeatability: identify which initial state and BIOS tick values would reproduce an identical star layout or animation.
-- [ ] Identify the exact computer-player decision entry points, action leaves, state inputs, and random-generator calls required by Phase 5.
-- [ ] Record the evidence, proposed types, remaining uncertainties, and confidence in `analysis/phase-4-findings.md`.
+- [x] Identify the exact computer-player decision entry points, action leaves, state inputs, and random-generator calls required by Phase 5.
+- [x] Record the evidence, proposed types, remaining uncertainties, and confidence in `analysis/phase-4-findings.md`.
 
 ### Outputs
 
@@ -255,3 +255,5 @@ For each candidate path, record its preconditions, event order, involved routine
 - Added an architecture-phase task to identify any reproducible crash path and recover its minimal causal event sequence.
 - Refined the apparent frontend starfield into a 90-tile `SPACEWAR` title that disperses and exactly reassembles through negated fixed-point velocities.
 - Identified a separate 90-pixel round-end effect that reuses the title's mutable arrays and a third unstored 512-pixel background system.
+- Completed Phase 4 with a validated computer-player handoff covering mode selection, action tables, state fields, bearing logic, and 28 instruction-aligned robot calls.
+- Established that the left robot is projectile-defensive while the right robot directly pursues the opposing ship, and recorded their different weapon and random-consumption policies for Phase 5.

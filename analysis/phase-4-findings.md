@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 4 is in progress. The approved pinned container and P4-02 address model are validated. P4-03 transferred all exact high-confidence function-entry proposals into namespaced subsystem groups without automatic disassembly or function creation. P4-04 recovered the random-generator design, and P4-05 recovered the title-particle and background design; the computer-player handoff is next.
+Phase 4 is complete. The approved pinned container and address model are validated, the high-confidence function map is applied, and the random, title/background, and computer-player handoff investigations are recorded below. Phase 5 can begin from exact decision entries, action leaves, state inputs, and random-call sites rather than from an unrestricted trace.
 
 ## Task log
 
@@ -13,7 +13,7 @@ Phase 4 is in progress. The approved pinned container and P4-02 address model ar
 | P4-03 | Apply the static function map | Transfer high-confidence functions and subsystem boundaries from `analysis/function-ledger.csv` | Complete |
 | P4-04 | Recover random-number design | Express seeding, the five-byte recurrence, caller range mapping, and repeatability | Complete |
 | P4-05 | Recover star and background generation | Explain frontend star initialization/animation and gameplay background placement | Complete |
-| P4-06 | Prepare the computer-player handoff | Identify decision entries, action leaves, state inputs, and random-number calls for Phase 5 | Ready |
+| P4-06 | Prepare the computer-player handoff | Identify decision entries, action leaves, state inputs, and random-number calls for Phase 5 | Complete |
 
 ## P4-01 validated container setup
 
@@ -340,6 +340,104 @@ The frontend calls it at `CS:0956` after clearing the framebuffer. Game initiali
 - The ignored preview independently reconstructs readable `SPACEWAR` lettering from the fixed positions and glyph data; no screenshot interpretation is required.
 - No debugger run is needed for P4-05. Timing in wall-clock terms remains emulator-speed dependent because the foreground animation is not paced by the custom timer.
 - P4-06 can now treat the particle arrays as unrelated scratch/state storage when mapping computer-player inputs, avoiding confusion with the live entity arrays.
+
+## P4-06 computer-player handoff
+
+### Evidence boundary
+
+The focused exporter validated the two complete control regions at runtime `CS:024F..04A5` and `CS:04A6..06F5`, both hyperspace implementations, the frontend robot-mode toggle region, four nine-entry action tables, the initial mode byte, both key-scan tables, the 32-word angle table, and 28 reviewed instruction-aligned direct calls made by the robot paths. The ignored report is `analysis/ghidra/exports/p4-06-computer-player-report.txt`; `analysis/ghidra-scripts/ExportComputerPlayerHandoff.java` reproduces its checks.
+
+A raw byte search is not a valid completeness proof for calls in these regions. Four `E8` bytes inside other instructions resemble near calls when decoded without instruction alignment. The exporter therefore validates the reviewed call instructions but explicitly reports that it did not use a raw-byte sweep to claim completeness. The publishable address handoff is `analysis/computer-player-handoff.csv`.
+
+### Mode selection and decision cadence
+
+The initialized byte at `DS:1076` is zero, so both players default to human control. In the frontend timer path, F3 scan state at `DS:126F` toggles bit 0 at `CS:17A4`; F4 state at `DS:1270` toggles bit 1 at `CS:17C7`. Edge latches in `DS:107A` prevent one held key from repeatedly toggling the option.
+
+| Side | Dispatcher | Human path | Robot path | Mode test |
+|---|---:|---:|---:|---|
+| Left | `CS:024F` | `CS:0259` | `CS:038E` | `DS:1076` bit 0 |
+| Right | `CS:04A6` | `CS:04B0` | `CS:05E5` | `DS:1076` bit 1 |
+
+The foreground game loop invokes the appropriate control routine once for each active ship before deciding whether cloak suppresses its rendering. Robot selection is therefore foreground-loop driven rather than directly timer driven. Individual effects remain constrained by shared state: energy transfers occur only when `(DS:1080 & 3) == 0`, and weapon or hyperspace helpers enforce their own energy, cooldown, allocation, and latch checks. Random consumption by robot decisions can consequently vary with foreground execution speed.
+
+### Shared action surface
+
+The human dispatch tables establish the same nine actions on both sides. They also give Phase 5 exact action leaves at which to compare a decision with its effect.
+
+| Action | Left press | Right press | Effect |
+|---|---:|---:|---|
+| Rotate clockwise | `CS:02AA` | `CS:0501` | Store rotation command `+2` |
+| Rotate counter-clockwise | `CS:02B6` | `CS:050D` | Store rotation command `-2` |
+| Weapon to shield | `CS:02C2` | `CS:0519` | Transfer one unit on every fourth shared tick |
+| Shield to weapon | `CS:02E1` | `CS:0538` | Transfer one unit on every fourth shared tick |
+| Phaser | `CS:0300` | `CS:0557` | Spend one weapon-energy unit and start phaser state `0x18` when allowed |
+| Photon | `CS:0320` | `CS:0577` | Allocate a free projectile when the latch permits |
+| Impulse | `CS:034E` | `CS:05A5` | Set action-flag bit 0 |
+| Cloak | `CS:0361` | `CS:05B8` | Set action-flag bit 1 |
+| Hyperspace | `CS:0374` | `CS:05CB` | Spend eight energy units and enter hyperspace when the latch permits |
+
+The human key order is `D A C Z Q E S W X` on the left and keypad `6 4 3 1 7 9 5 8 2` on the right. Phase 3 dynamically confirmed the left counter-clockwise and phaser leaves. Robot code reuses the energy, weapon, impulse, and hyperspace helpers, but directly commits its calculated aim instead of calling the gradual rotation leaves. Neither robot calls its cloak helper.
+
+### Proposed state types
+
+The robot code accesses the following initialized-data fields. Left uses entity slot `00`; right uses slot `10`. Array element widths vary by field, so the slot values below are byte indices used by the code rather than logical player numbers.
+
+| Initialized `DS:` field | Proposed type and role | Robot use |
+|---:|---|---|
+| `1076` | `uint8` robot-mode flags | Dispatch bits 0 and 1 |
+| `1080` | `uint8` shared tick | Four-tick energy-transfer gate in action helpers |
+| `0D1C` / `0D2C` | `uint16` left/right X integer position | Threat or opponent delta |
+| `0D3C` / `0D4C` | `uint16` left/right Y integer position | Threat or opponent delta |
+| `0E1C` / `0E2C` | `uint8` render-dirty state | Set after direct aim change |
+| `0E3C` / `0E4C` | signed byte entity active/type arrays | Ship and projectile eligibility |
+| `0E5C` / `0E6C` | `uint16` ship angle | Direct robot aim target |
+| `0E9C` / `0EAC` | signed byte rotation command | Cleared when robot commits aim |
+| `0EBC` / `0ECC` | `uint8` action flags | Bit 0 impulse; bit 1 cloak |
+| `0EDC` / `0EEC` | `uint8` action latches | Bit 0 photon; bit 1 hyperspace |
+| `0EFC` / `0F0C` | `uint8` shield energy | Balance decision and helper checks |
+| `0F1C` / `0F2C` | `uint8` weapon energy | Balance decision and zero-energy exit |
+| `0F7C` / `0F8C` | `uint8` phaser state/cooldown | Enforced inside the phaser helper |
+| `2250` | `uint16[32]` ratio-to-angle thresholds | Quantized bearing calculation |
+
+Velocity, planet/gravity state, and world-wrap flags are not direct robot inputs. Cooldown, projectile allocation, and action-latch fields affect outcomes through the reused action helpers rather than through the decision branches themselves.
+
+### Left defensive policy
+
+The left path at `CS:038E` first tries to balance shield and weapon energy toward equality. If weapon energy is zero it disables impulse, takes the phaser release path, and returns.
+
+It then scans right-side projectile slots `10, 12, ... 1E`. A slot qualifies when its entity byte is active and non-negative and both raw absolute coordinate differences from the left ship are below `0x60`. It uses the first qualifying slot; distance does not use the world's wrapped shortest path. For a threat, the routine calculates a bearing, directly writes the left angle at `CS:046C`, marks the ship dirty, and invokes the phaser helper.
+
+The path finishes with two independent random decisions:
+
+- At `CS:0484`, raw `AL < 0x10` enables impulse; otherwise impulse is disabled.
+- At `CS:0494`, `(AX & 0x03FF) == 0` requests hyperspace; otherwise it releases the hyperspace latch.
+
+With no qualifying projectile it skips aim and phaser work but still reaches both random movement decisions. It never selects photon or cloak. This control flow supports the executable's own description of the left robot as defensive.
+
+### Right offensive policy
+
+The right path at `CS:05E5` calculates raw signed X/Y differences from the right ship to the left ship and counts how many axes have absolute difference below `0x60`. It computes a bearing to the opponent, directly writes the right angle at `CS:0677`, marks the ship dirty, and then balances its two energy stores. If weapon energy is zero it disables impulse, releases photon, and returns.
+
+Three random decisions follow:
+
+- At `CS:06B0`, raw `AL < 0x10` enables impulse; otherwise impulse is disabled.
+- At `CS:06C0`, `AL >= 8` releases both weapon actions. For `AL < 8`, two close axes select phaser while any other proximity count selects photon.
+- At `CS:06E4`, `(AX & 0x03FF) == 0` requests hyperspace; otherwise it releases the hyperspace latch.
+
+The right robot always aims at the opposing ship, uses both weapon helpers, never selects cloak, and consumes one more random value per full decision than the left robot. This control flow supports the executable's description of the right robot as offensive.
+
+### Bearing calculation and asymmetries
+
+Both paths take absolute X/Y magnitudes, retain quadrant information, compare the two axes, form a 16-bit fixed-point ratio, and use the 32 thresholds at `DS:2250` to quantize a bearing. They then store that bearing directly rather than requesting gradual rotation. Neither path corrects coordinate deltas for the toroidal playfield, so a target just across an edge can appear far away or in the longer direction.
+
+The implementations share data layout, bearing machinery, energy balancing, movement probability, and hyperspace probability. Their principal difference is policy rather than simple mirroring: left targets the first nearby hostile projectile and fires phaser; right targets the opposing ship and probabilistically chooses phaser or photon according to axis-aligned proximity. The right-only weapon draw also advances the one shared random stream differently.
+
+### Confidence and Phase 5 starting questions
+
+- Confidence is high in the entry points, action addresses, state accesses, comparison constants, branch order, random call sites, and left/right policy difference because all are present in bounded bytes and validated aligned calls.
+- `defensive` and `offensive` are supported interpretations from both behavior and embedded instructions; they are not recovered source-level names.
+- The bearing's exact visual orientation and the practical effect of non-wrapped deltas are best expressed and tested in Phase 5 after normalizing the angle convention.
+- The current static map is sufficient to begin Phase 5 without a broad debugger trace. Useful bounded experiments should target only remaining gameplay questions such as edge-wrap mis-aim, action cadence, or a proposed difficulty change.
 
 ## Evidence and uncertainty policy
 
