@@ -51,8 +51,8 @@ DOS entry CS:0000
        └─ F2: reset stack and enter game at CS:00BC
             ├─ initialize live state from embedded template
             ├─ install game timer ISR at CS:233D
-            ├─ foreground: input dispatch and XOR erase/redraw
-            ├─ timer ISR: simulation, collision, timing, and sound
+            ├─ foreground: input, XOR erase/redraw, collision, and round decisions
+            ├─ timer ISR: motion, resources, cooldowns, timing, and sound
             └─ F1 or round end: return to frontend
 ```
 
@@ -120,6 +120,7 @@ The live game is divided across foreground and interrupt contexts.
 - XOR-erases objects using their previous position/frame.
 - Snapshots current state under `CLI` and clears dirty flags.
 - XOR-redraws objects at their new position/frame.
+- Resolves ship, projectile, phaser, and optional planet collision/damage paths.
 - Draws status indicators and round effects.
 - Handles F1 return to frontend and F7/F8 pause/sound toggles.
 
@@ -131,13 +132,12 @@ The live game is divided across foreground and interrupt contexts.
 - Advances fixed-point position and velocity.
 - Wraps positions in a `640 x 200` world.
 - Updates projectile lifetimes and positions.
-- Applies collision and damage rules.
 - Handles energy consumption and recharge intervals.
 - Applies optional planet and gravity behavior.
 - Updates sound selection and PC-speaker frequency.
 - Marks objects dirty for the foreground renderer.
 
-This is a producer/consumer arrangement over shared state. The timer produces new simulation state and dirty flags; the foreground consumes those flags to erase and redraw. Short `CLI` sections protect snapshots and slot activation/deactivation.
+This is cooperative shared-state concurrency. The timer produces motion/resource state and dirty flags, while the foreground consumes those flags and also produces actions, collision damage, projectile state, and transitions. Short `CLI` sections protect snapshots and slot activation/deactivation.
 
 ## Data design
 

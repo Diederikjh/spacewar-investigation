@@ -127,7 +127,7 @@ The ignored raw reports are `analysis/ghidra/exports/p4-02-import-report.txt` an
 
 ## P4-03 high-confidence function map
 
-The tracked function ledger contains 53 proposed entries: 44 `high`, eight `medium-high`, and one `medium`. P4-03 applied only the 44 exact `high` rows. The remaining nine rows were intentionally deferred rather than silently promoted.
+At the P4-03 checkpoint, the tracked function ledger contained 53 proposed entries: 44 `high`, eight `medium-high`, and one `medium`. P4-03 applied only those 44 exact `high` rows. Phase 6 later refined one effect name and added the foreground collision family to the continuing ledger; those later rows were not part of the P4-03 label transfer.
 
 Each applied name is a user-defined label nested beneath two explicit namespaces:
 

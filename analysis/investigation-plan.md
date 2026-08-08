@@ -28,7 +28,7 @@ The investigation aims to recover architectural intent and important data struct
 | 3. Controlled DOS runs | Complete | Runtime entry, mode transitions, input paths, and normal shutdown confirmed in `phase-3-findings.md` |
 | 4. Ghidra analysis | Complete | Random, title/background, and computer-player handoff designs recovered in `phase-4-findings.md` |
 | 5. Computer-player behavior | Complete | Normalized policies, asymmetries, state ledger, executable model, and ranked difficulty changes recorded in `phase-5-findings.md` |
-| 6. Architecture reconstruction | Not started | Produce an evidence-backed code-design document |
+| 6. Architecture reconstruction | Complete | State model, execution contexts, subsystem boundaries, memory design, and failure audit recorded in `phase-6-findings.md` |
 
 ## Findings-document convention
 
@@ -200,11 +200,25 @@ Correlate static and dynamic evidence into an architecture document covering:
 - Hardware and DOS/BIOS dependencies.
 - Unknowns, competing interpretations, and confidence levels.
 
+### Tasks
+
+- [x] Correlate startup, frontend, gameplay, interrupt, and shutdown evidence into one application state model.
+- [x] Separate foreground-iteration work from fixed-rate timer work and correct the earlier collision-owner shorthand.
+- [x] Record execution contexts, shared-state synchronization, memory layout, entity arrays, and subsystem boundaries.
+- [x] Record DOS, BIOS, CGA, PIT, PIC, keyboard-controller, and speaker dependencies.
+- [x] Record uncertainties and confidence levels in `analysis/phase-6-findings.md`.
+
 ### Failure-path question
 
-- [ ] Determine whether a reproducible game crash path exists and, if so, recover the minimal ordered series of gameplay, input, interrupt, timing, and state-transition events that causes it.
+- [x] Determine whether a reproducible game crash path exists and, if so, recover the minimal ordered series of gameplay, input, interrupt, timing, and state-transition events that causes it. No ordinary game crash was reproduced; the candidate matrix and bounded low-memory result are recorded in `analysis/phase-6-findings.md`.
 
 For each candidate path, record its preconditions, event order, involved routines and shared state, last known valid state, observed failure signature, evidence, and confidence. Distinguish a game defect from a debugger, emulator, or unsupported-hardware failure. Begin with static evidence around interrupt/foreground coordination, non-local mode transitions and stack resets, entity and projectile bounds, resource exhaustion, and option changes. Use a bounded debugger experiment only for a specific remaining hypothesis, keep raw traces and run copies ignored, and do not modify the original executable.
+
+### Outputs
+
+- `analysis/phase-6-findings.md`
+- Corrected collision ownership in `analysis/phase-2-findings.md`
+- Refined collision/effect entries in `analysis/function-ledger.csv`
 
 ## Post-design follow-up investigations
 
@@ -287,3 +301,8 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Applied the debugger gate and concluded that a run would not resolve any current static ambiguity.
 - Added cloak-aware computer-player targeting as a deferred post-design investigation with separate left/right behavior, code-placement constraints, an effort estimate, and bounded validation criteria.
 - Recorded six executable code-space strategies, including the exact 108-byte padding-promotion layout and the larger same-segment capacity available to future implementations.
+- Completed Phase 6 with a unified application state model, foreground/timer ownership map, memory/subsystem reconstruction, and hardware dependency map.
+- Refined ordinary collision handling as foreground work while the gameplay timer owns motion, resources, cooldowns, hyperspace, planet, and audio timing.
+- Audited non-local transitions, stack use, entity bounds, dispatch tables, divide sites, resource sentinels, pause/options, deliberate reset, unsupported CGA, and the earlier debugger failure signature.
+- Ran one ignored low-memory startup probe; the tightest tested loadable reservation reached the custom-stack checkpoint, so the wrapped initial stack remains a portability weakness rather than a reproduced crash.
+- Found no reproducible ordinary gameplay crash and recorded remaining confidence boundaries in `analysis/phase-6-findings.md`.
