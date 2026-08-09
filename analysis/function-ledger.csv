@@ -35,6 +35,8 @@ load_module_offset,cs_offset,proposed_name,subsystem,confidence,evidence
 0x4767,0x1CB7,xor_star,rendering,high,"Selects a star glyph and XOR-renders it at indexed position"
 0x4783,0x1CD3,clear_cga_framebuffer,rendering,high,"Zeros 0x4000 bytes at configured video segment"
 0x4792,0x1CE2,xor_planet,rendering,high,"Selects one of sixteen planet frames and writes 32 CGA scanlines"
+0x48E0,0x1E30,apply_planet_gravity,gameplay,high,"Adds negative eight times each raw integer displacement from planet center 319,99 to an active entity's signed 16.16 velocity"
+0x4935,0x1E85,scale_gravity_components,math,high,"Multiplies absolute X and Y displacement components by eight before quadrant signs are restored"
 0x4950,0x1EA0,build_cga_scanline_table,platform,high,"Builds 200 offsets for CGA's alternating 0x2000-byte scanline banks"
 0x496C,0x1EBC,save_interrupt_vectors,platform,high,"Copies interrupt vectors 8 and 9 from the IVT into program data"
 0x4992,0x1EE2,restore_interrupts_and_pit,platform,high,"Restores vectors 8 and 9 and resets PIT channel 0 to the BIOS rate"

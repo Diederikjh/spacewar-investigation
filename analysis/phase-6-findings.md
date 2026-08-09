@@ -194,6 +194,40 @@ The handler at `CS:233D` performs:
 
 The timer produces new coordinates, resource values, and dirty flags. The foreground consumes them, but it also produces action flags, projectile activations, damage, and transitions. The architecture is therefore cooperative shared-state concurrency rather than a strict one-way producer/consumer pipeline.
 
+### Gravity calculation
+
+F6 toggles mask `02` in `DS:2040`. While that mask is set, the gameplay timer calls `CS:1E30` once for every positive-state entity immediately after updating and wrapping its position. Ships and projectiles receive the same acceleration; the calculation has no entity mass or type parameter.
+
+The planet and gravity center is integer coordinate `(319, 99)`. For an entity at current integer position `(x, y)`, the routine performs:
+
+```text
+dx = x - 319
+dy = y - 99
+
+velocity_x_16_16 += -8 * dx
+velocity_y_16_16 += -8 * dy
+```
+
+The additions go into the low words at `DS:0DDC + slot` and `DS:0DFC + slot`, with sign extension into the high words at `DS:0D9C + slot` and `DS:0DBC + slot`. Interpreting those word pairs as signed 16.16 velocity gives:
+
+```text
+change in x velocity = -(x - 319) / 8192 pixels per timer tick
+change in y velocity = -(y -  99) / 8192 pixels per timer tick
+```
+
+This is a linear restoring field, similar to a two-dimensional spring, rather than inverse-square gravity. Acceleration is zero at the center and grows linearly with axis distance. It needs no square root, division, radial-distance table, or near-center special case. Across the playable coordinate bounds, the raw X component ranges from `+2488` to `-2496` and the Y component from `+728` to `-736`, so the intermediate signed words cannot overflow.
+
+Position is advanced before gravity is added, so the new acceleration affects motion beginning with the next timer tick. There is no gravity-specific velocity cap. The impulse path limits ship thrust contributions, but gravity is added afterward and projectile velocities receive it directly.
+
+For the initial ship positions:
+
+| Ship | Position | Fixed-point velocity change per tick | Direction |
+|---|---:|---:|---|
+| Left | `(160, 46)` | `(+1272, +424)` | Down and right, toward the planet |
+| Right | `(480, 138)` | `(-1288, -312)` | Up and left, toward the planet |
+
+The option bits are independent. Mask `01` controls planet rendering and planet collision, while mask `02` controls gravity. Gravity can therefore act around the invisible center `(319, 99)` when the planet display is disabled.
+
 ## Data and memory model
 
 ### Segment layout

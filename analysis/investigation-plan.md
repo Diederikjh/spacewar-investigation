@@ -306,3 +306,4 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Audited non-local transitions, stack use, entity bounds, dispatch tables, divide sites, resource sentinels, pause/options, deliberate reset, unsupported CGA, and the earlier debugger failure signature.
 - Ran one ignored low-memory startup probe; the tightest tested loadable reservation reached the custom-stack checkpoint, so the wrapped initial stack remains a portability weakness rather than a reproduced crash.
 - Found no reproducible ordinary gameplay crash and recorded remaining confidence boundaries in `analysis/phase-6-findings.md`.
+- Added the exact per-entity gravity formula, fixed-point units, update order, initial-player examples, and independence from planet rendering.
