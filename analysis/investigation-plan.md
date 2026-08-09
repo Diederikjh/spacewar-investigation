@@ -317,3 +317,4 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Indexed the seven ranked Phase 5 computer-player difficulty candidates as proposed edits without duplicating their detailed evidence.
 - Indexed cloak-aware computer-player targeting as a separate proposed behavior change.
 - Expanded the Phase 6 `LiveGame` state into its foreground pipeline, independent control-mode combinations, human action surface, and distinct left and right computer-player policy blocks.
+- Implemented the size-preserving `EDIT-CPU-05` wrapped-aim prototype in the existing physical zero padding and recorded guarded patch generation, static validation, and a successful debugger startup smoke test.

@@ -137,6 +137,26 @@ def self_test() -> None:
     assert not left_detects_threat(raw_x, 0)
     assert left_detects_threat(wrapped_x, 0)
 
+    # EDIT-CPU-05 uses strict half-world comparisons: an exact half-world
+    # tie keeps its original sign, while the next unit takes the shorter
+    # direction around the playfield.
+    assert wrapped_delta(320, 0, 640) == 320
+    assert wrapped_delta(0, 320, 640) == -320
+    assert wrapped_delta(321, 0, 640) == -319
+    assert wrapped_delta(0, 321, 640) == 319
+    assert wrapped_delta(100, 0, 200) == 100
+    assert wrapped_delta(0, 100, 200) == -100
+    assert wrapped_delta(101, 0, 200) == -99
+    assert wrapped_delta(0, 101, 200) == 99
+
+    for extent in (640, 200):
+        half_extent = extent // 2
+        for origin in range(extent):
+            for target in range(extent):
+                delta = wrapped_delta(target, origin, extent)
+                assert -half_extent <= delta <= half_extent
+                assert (origin + delta) % extent == target
+
 
 def main() -> None:
     self_test()
