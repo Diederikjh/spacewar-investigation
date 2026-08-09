@@ -316,3 +316,4 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Added a more realistic softened-gravity proposal with implementation decisions, 16-bit constraints, and validation criteria.
 - Indexed the seven ranked Phase 5 computer-player difficulty candidates as proposed edits without duplicating their detailed evidence.
 - Indexed cloak-aware computer-player targeting as a separate proposed behavior change.
+- Expanded the Phase 6 `LiveGame` state into its foreground pipeline, independent control-mode combinations, human action surface, and distinct left and right computer-player policy blocks.

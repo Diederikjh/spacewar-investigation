@@ -66,6 +66,137 @@ stateDiagram-v2
 
 Ctrl-Alt-Delete is an out-of-band transition available whenever the keyboard handler is active. It writes the BIOS warm-boot marker and transfers to the reset vector rather than entering the normal shutdown state.
 
+### Live-game expansion
+
+`LiveGame` is a cooperative subsystem rather than a single undivided state. Each foreground iteration selects one complete control path for the left ship, renders the left-side entities, selects one complete control path for the right ship, renders the right-side entities, and then performs the shared collision, effect, status, and transition work. The gameplay timer can interrupt this foreground work to update the same round state.
+
+```mermaid
+flowchart TB
+    Timer["Gameplay timer IRQ"] -. "updates shared live-game state" .-> Begin
+
+    subgraph LiveGame["Live-game subsystem"]
+        direction TB
+        Begin["Begin foreground iteration"] --> LeftActive{"Left ship active?"}
+        LeftActive -->|Yes| LeftMode{"Left computer-player bit set?"}
+        LeftActive -->|No| LeftEntities
+        LeftMode -->|No| LeftHuman["Left human dispatcher"]
+        LeftMode -->|Yes| LeftComputer["Left computer-player policy"]
+        LeftHuman --> LeftEntities["Left ship and projectile rendering"]
+        LeftComputer --> LeftEntities
+
+        LeftEntities --> RightActive{"Right ship active?"}
+        RightActive -->|Yes| RightMode{"Right computer-player bit set?"}
+        RightActive -->|No| RightEntities
+        RightMode -->|No| RightHuman["Right human dispatcher"]
+        RightMode -->|Yes| RightComputer["Right computer-player policy"]
+        RightHuman --> RightEntities["Right ship and projectile rendering"]
+        RightComputer --> RightEntities
+
+        RightEntities --> SharedWork["Collisions, destruction effects, status, and exit checks"]
+        SharedWork --> Transition{"Transition condition?"}
+        Transition -->|None| Begin
+        Transition -->|F7| Paused["GamePaused"]
+        Transition -->|Negative shield| End["RoundEnd"]
+        Transition -->|F1| Menu["Frontend"]
+    end
+```
+
+The gameplay timer's shared-state updates cover motion, resources, cooldowns, hyperspace, planet animation, and audio.
+
+The two mode bits are independent. The detailed blocks below replace the corresponding human dispatcher without changing the rest of the live-game pipeline.
+
+| `DS:1076` bits 1..0 | Left control block | Right control block |
+|---:|---|---|
+| `00` | Human | Human |
+| `01` | Computer player | Human |
+| `10` | Human | Computer player |
+| `11` | Computer player | Computer player |
+
+#### Human-versus-human control block
+
+With both mode bits clear, the foreground reads the shared keyboard-state table through the left dispatcher at `CS:0259` and then the right dispatcher at `CS:04B0`. The dispatchers sample the current held-key states once per foreground iteration; action helpers and timer-paced resource rules determine whether each requested effect can occur.
+
+```mermaid
+flowchart LR
+    subgraph HumanGame["Human-versus-human control"]
+        LeftKeys["Left keys"] --> LeftDispatch["Left human dispatcher"]
+        RightKeys["Right keypad keys"] --> RightDispatch["Right human dispatcher"]
+        LeftDispatch --> Actions["Mirrored ship action helpers"]
+        RightDispatch --> Actions
+        Actions --> RoundState["Shared live round state"]
+    end
+
+    RoundState --> TimerEffects["Timer applies rotation, thrust, recurring energy costs, and cooldowns"]
+    RoundState --> ForegroundEffects["Foreground fires weapons, renders entities, and resolves collisions"]
+```
+
+| Action | Left key | Right key | Requested effect |
+|---|---:|---:|---|
+| Rotate clockwise | `D` | keypad `6` | Store rotation command `+2` |
+| Rotate counter-clockwise | `A` | keypad `4` | Store rotation command `-2` |
+| Weapon to shield | `C` | keypad `3` | Transfer one unit while the shared tick is divisible by four |
+| Shield to weapon | `Z` | keypad `1` | Transfer one unit while the shared tick is divisible by four |
+| Phaser | `Q` | keypad `7` | Spend one weapon unit and start the phaser when ready |
+| Photon | `E` | keypad `9` | Spend one weapon unit and allocate a free projectile when its latch permits |
+| Impulse | `S` | keypad `5` | Set action-flag bit 0; the timer applies thrust and recurring cost |
+| Cloak | `W` | keypad `8` | Set action-flag bit 1; the timer applies recurring cost and foreground drawing omits the ship |
+| Hyperspace | `X` | keypad `2` | Spend eight weapon units and start hyperspace when its latch permits |
+
+F1 returns the round to the frontend, F7 pauses or resumes play, and F8 toggles sound. These are round-wide live-game controls rather than actions belonging to either ship.
+
+#### Left computer-player control block
+
+When mode bit 0 is set, `CS:038E` replaces the left human dispatcher with a proximity-defense policy. It can target the right ship or the right projectile pool, but it never requests photon fire or cloak.
+
+```mermaid
+flowchart TD
+    L0["Left computer-player iteration"] --> L1["Balance shield and weapon energy"]
+    L1 --> L2{"Weapon energy zero?"}
+    L2 -->|Yes| L3["Disable impulse, release phaser, and return"]
+    L2 -->|No| L4["Scan active right ship, then projectiles in slot order"]
+    L4 --> L5{"First entity under 0x60 away on both raw axes?"}
+    L5 -->|Yes| L6["Commit direct bearing and try phaser"]
+    L5 -->|No| L7["Keep previous heading"]
+    L6 --> L8{"Random byte under 0x10?"}
+    L7 --> L8
+    L8 -->|Yes| L9["Enable impulse"]
+    L8 -->|No| L10["Disable impulse"]
+    L9 --> L11{"Random word masked by 0x03FF is zero?"}
+    L10 --> L11
+    L11 -->|Yes| L12["Request hyperspace"]
+    L11 -->|No| L13["Release hyperspace latch"]
+```
+
+The right ship has target priority because its slot is scanned first. If it is not close, the first close active right projectile wins. With no qualifying target, random impulse and hyperspace decisions still occur.
+
+#### Right computer-player control block
+
+When mode bit 1 is set, `CS:05E5` replaces the right human dispatcher with a pursuit policy. It always calculates a direct bearing to the left ship and can select either weapon, but it never requests cloak.
+
+```mermaid
+flowchart TD
+    R0["Right computer-player iteration"] --> R1["Measure raw delta to left ship and count close axes"]
+    R1 --> R2["Commit direct bearing to left ship"]
+    R2 --> R3["Balance shield and weapon energy"]
+    R3 --> R4{"Weapon energy zero?"}
+    R4 -->|Yes| R5["Disable impulse, release photon, and return"]
+    R4 -->|No| R6{"Random byte under 0x10?"}
+    R6 -->|Yes| R7["Enable impulse"]
+    R6 -->|No| R8["Disable impulse"]
+    R7 --> R9{"Weapon random byte under 0x08?"}
+    R8 --> R9
+    R9 -->|No| R10["Release phaser and photon"]
+    R9 -->|Yes, both axes close| R11["Release photon and try phaser"]
+    R9 -->|Yes, either axis distant| R12["Release phaser and try photon"]
+    R10 --> R13{"Random word masked by 0x03FF is zero?"}
+    R11 --> R13
+    R12 --> R13
+    R13 -->|Yes| R14["Request hyperspace"]
+    R13 -->|No| R15["Release hyperspace latch"]
+```
+
+Both computer-player blocks run at foreground speed and reuse the same side-specific action helpers as human control. Their direct bearing updates replace gradual rotation commands. The timer later applies impulse and recurring costs, while the foreground performs weapon creation or tracing, rendering, and collision work. When both computer players are enabled, the left policy runs first and consumes its shared random values before the right policy runs.
+
 ### Frontend pause
 
 Frontend pause stops the foreground carousel at calls to `CS:1895`, but the frontend timer continues. The timer can therefore observe F7 again, update option latches, maintain BIOS time, and animate the enabled planet while the carousel is paused.
