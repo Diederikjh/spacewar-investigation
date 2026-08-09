@@ -224,6 +224,8 @@ For each candidate path, record its preconditions, event order, involved routine
 
 Begin these only after the Phase 6 architecture document has been captured and reviewed.
 
+Potential executable changes are centrally indexed in the [potential edits ledger](potential-edits.md). Ledger entries are proposals only and require separate review before implementation.
+
 ### Cloak-aware computer-player targeting
 
 - [ ] Confirm whether projectiles fired by a cloaked ship remain independently visible and targetable; the current recommendation is yes.
@@ -307,3 +309,10 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Ran one ignored low-memory startup probe; the tightest tested loadable reservation reached the custom-stack checkpoint, so the wrapped initial stack remains a portability weakness rather than a reproduced crash.
 - Found no reproducible ordinary gameplay crash and recorded remaining confidence boundaries in `analysis/phase-6-findings.md`.
 - Added the exact per-entity gravity formula, fixed-point units, update order, initial-player examples, and independence from planet rendering.
+
+### 2026-08-09
+
+- Added `analysis/potential-edits.md` as the central index for future executable-change proposals.
+- Added a more realistic softened-gravity proposal with implementation decisions, 16-bit constraints, and validation criteria.
+- Indexed the seven ranked Phase 5 computer-player difficulty candidates as proposed edits without duplicating their detailed evidence.
+- Indexed cloak-aware computer-player targeting as a separate proposed behavior change.

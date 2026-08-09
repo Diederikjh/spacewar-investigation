@@ -228,6 +228,8 @@ For the initial ship positions:
 
 The option bits are independent. Mask `01` controls planet rendering and planet collision, while mask `02` controls gravity. Gravity can therefore act around the invisible center `(319, 99)` when the planet display is disabled.
 
+A softened inverse-square or lookup-table approximation is tracked as proposed edit `EDIT-GRAV-01` in the [potential edits ledger](potential-edits.md). It is a future design candidate, not a change to the current executable or to the architecture described above.
+
 ## Data and memory model
 
 ### Segment layout

@@ -189,6 +189,8 @@ The timer can also interrupt between separate foreground reads of X and Y. The r
 
 These are investigation candidates only. No executable was modified. Any proof of concept must be separately reviewed and applied only to an ignored run copy.
 
+The seven candidates are also indexed as `EDIT-CPU-01` through `EDIT-CPU-07` in the [potential edits ledger](potential-edits.md). This Phase 5 section remains the detailed source for their ranking, constants, expected effects, and risks.
+
 | Rank | Candidate | Exact current decision | Proposed change | Expected effect | Applies to | Risk |
 |---:|---|---|---|---|---|---|
 | 1 | Increase right weapon attempts | `CS:06C3` compares `AL` with `08` | Change the immediate to `10` for a first trial | Doubles the accepted raw-byte set from 8 to 16 values, subject to cooldowns, latches, energy, and projectile capacity | Right | Low code risk; faster energy use and more screen activity |

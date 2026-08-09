@@ -23,6 +23,7 @@ bash analysis/scripts/phase1-inventory.sh
 Start with the following documents:
 
 - [Investigation plan](analysis/investigation-plan.md)
+- [Potential edits ledger](analysis/potential-edits.md)
 - [Phase 1 findings](analysis/phase-1-findings.md)
 - [General DOS investigation context](docs/dos-game-investigate-context.md)
 
