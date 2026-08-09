@@ -4,7 +4,7 @@
 
 `EDIT-CPU-05` now has a size-preserving prototype patcher. It converts the computer players' raw X/Y target deltas into shortest wrapped deltas before proximity tests and bearing calculation. The patch promotes the executable's existing 108 trailing zero bytes into the declared MZ image; it does not append, insert, or remove any physical file bytes.
 
-The generated ignored run copy reached the normal animated frontend under the debugger build. No obvious MZ load, startup, display, title, score, or option-row corruption was visible. This is a startup smoke result, not yet proof of the changed edge-crossing behavior during play.
+The generated ignored run copy reached the normal animated frontend under the debugger build. No obvious MZ load, startup, display, title, score, or option-row corruption was visible. Controlled debugger runs then confirmed wrapped X/Y bearing for the right computer player and wrapped X proximity plus bearing for the left computer player.
 
 ## Applying the patch
 
@@ -74,18 +74,32 @@ All new control transfers are ordinary near calls within the existing code segme
 - The patched ignored copy has SHA-256 `c96ba303ae45cfbea51719e20e0e8a2ea5bdcc944e5ea633645ef57b968be682`.
 - The executable model exhaustively checks all origin/target coordinate pairs for both world extents, including the four half-world boundary directions.
 
-## Debugger smoke result
+## Debugger validation
+
+### Startup smoke result
 
 The generated patched copy was launched with the existing debugger build and normal CGA configuration. It reached the animated frontend with the expected title, random background, planet, version/copyright text, initial scores, and option row. No illegal-instruction stream, premature termination, graphics corruption, or visible startup failure occurred.
 
-The smoke test exercises the expanded MZ load boundary and ordinary startup but does not execute either new computer-player helper. A later bounded gameplay test must enable each computer player and place the ships or a qualifying projectile across an X and Y boundary before `EDIT-CPU-05` can be considered behaviorally validated.
+The smoke test exercises the expanded MZ load boundary and ordinary startup. The controlled tests below separately execute every new helper used by ship targeting.
+
+### Controlled ship-target results
+
+The debugger and DOSBox windows ran in the same X session. Coordinates were written only while stopped at the relevant policy entry, and adjacent code breakpoints captured values before and after each helper. Screenshots were temporary validation aids and are not repository artefacts.
+
+| Policy and state | Raw delta | Wrapped result | Downstream observation | Result |
+|---|---:|---:|---:|---|
+| Right at `(631,100)`, left target at `(8,100)` | `CX=FD91` (`-623`) | `CX=0011` (`+17`), `DX=0000` | `AL=00`, aim right | Pass |
+| Right at `(8,100)`, left target at `(631,100)` | `CX=026F` (`+623`) | `CX=FFEF` (`-17`), `DX=0000` | `AL=80`, aim left | Pass |
+| Right at `(100,191)`, left target at `(100,8)` | `DX=FF49` (`-183`) | `CX=0000`, `DX=0011` (`+17`) | `AL=40`, aim down | Pass |
+| Left at `(8,100)`, right target at `(631,100)` | Absolute raw X would be `623`; bearing `CX=026F` | Proximity `AX=0011` (`17`); bearing `CX=FFEF` (`-17`) | Accepted below `0060`; `AL=80`, aim left | Pass |
+
+The first three rows validate both signed branches of X wrapping, one signed branch of Y wrapping, and the right wrapper. The fourth validates the left-only absolute-magnitude path, its strict proximity comparison, and the left signed wrapper. Together they execute the promoted helper entries at `CS:2AE4`, `CS:2B07`, `CS:2B32`, and `CS:2B3E`. The left Y absolute entry at `CS:2AE9` also executed with a zero Y delta during the fourth test.
 
 ## Remaining validation
 
 1. Capture the dedicated Ghidra padding-ownership audit when the isolated analysis environment is available.
-2. Run the left computer player with the right ship just across each world edge and confirm both threat acceptance and the committed bearing.
-3. Repeat the left test with the first qualifying right projectile while the right ship is outside the wrapped acceptance square.
-4. Run the right computer player across each edge and confirm its bearing and phaser-versus-photon proximity classification.
-5. Exercise exact X `+/-320` and Y `+/-100` ties to confirm the documented sign policy.
-6. Run both computer players together long enough to observe repeated helper calls, weapons, impulse, hyperspace, and a normal frontend/round transition.
-7. Confirm the original executable hash remains unchanged and keep every patched executable ignored.
+2. Repeat the left proximity test with the first qualifying right projectile while the right ship is outside the wrapped acceptance square.
+3. Confirm the right computer player's wrapped close-axis count selects phaser rather than photon when both wrapped axes are below `0x60`.
+4. Exercise the opposite vertical direction and exact X `+/-320` and Y `+/-100` ties to confirm the documented sign policy.
+5. Run both computer players together long enough to observe repeated helper calls, weapons, impulse, hyperspace, and a normal frontend/round transition.
+6. Confirm the original executable hash remains unchanged and keep every patched executable ignored.

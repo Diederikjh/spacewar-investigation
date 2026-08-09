@@ -13,7 +13,7 @@ The original executable remains immutable. Detailed investigation findings remai
 | Proposed | An evidence-backed idea exists, but implementation has not been approved |
 | Design pending | Important semantics or implementation choices remain open |
 | Investigation pending | More evidence is required before implementation design |
-| Prototype | Applied to an ignored run copy, but bounded behavior validation remains |
+| Prototype | Applied to an ignored run copy, but one or more validation layers remain |
 | Implemented | Applied to an ignored run copy and validated; never implies that the original changed |
 
 ## Ledger
@@ -25,7 +25,7 @@ The original executable remains immutable. Detailed investigation findings remai
 | `EDIT-CPU-02` | Widen left proximity defense | Computer player | Proposed; Phase 5 rank 2 | Let the defensive player engage ships and projectiles from farther away | More distant low-priority phaser use | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-03` | Increase right pursuit thrust | Computer player | Proposed; Phase 5 rank 3 | Close distance more aggressively | Energy drain and overshoot | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-04` | Reduce right random escapes | Computer player | Proposed; Phase 5 rank 4 | Keep the pursuing player in combat more often | Hyperspace may currently provide useful defense | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
-| `EDIT-CPU-05` | Use shortest wrapped deltas | Computer player | Prototype; startup smoke passed; behavior validation pending | Correct edge-crossing aim and proximity errors | New code space and careful signed wrap arithmetic | [Prototype findings](edit-cpu-05-findings.md) |
+| `EDIT-CPU-05` | Use shortest wrapped deltas | Computer player | Prototype; bounded ship-target behavior passed; extended validation pending | Correct edge-crossing aim and proximity errors | New code space and careful signed wrap arithmetic | [Prototype findings](edit-cpu-05-findings.md) |
 | `EDIT-CPU-06` | Add target leading | Computer player | Proposed; Phase 5 rank 6 | Improve attacks against moving targets | High implementation and tuning complexity; trajectory prediction must follow the active gravity model | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-07` | Improve left target selection | Computer player | Proposed; Phase 5 rank 7 | Avoid first-slot distractions and make defense more deliberate | Changes the left player's established defensive character | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-08` | Honour cloak while targeting | Computer player | Investigation pending; design captured | Prevent computer players from seeing a cloaked ship while retaining visible-projectile reactions | Separate left/right policy changes, random-call cadence, and code placement | [Deferred cloak-aware targeting](phase-5-findings.md#deferred-follow-up-cloak-aware-targeting) |
