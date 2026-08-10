@@ -6,7 +6,8 @@
 
 The replacement is 111 bytes. It fits inside the original 102-byte gravity routine and helper plus nine of the ten adjacent zero bytes. One zero byte remains before the next known routine. The edit does not promote the end-of-file padding, change the MZ-declared size, append a byte, or conflict with the separate code range used by `EDIT-CPU-05`.
 
-Static validation has passed. Debugger startup and bounded runtime behavior remain pending.
+Static validation and a bounded debugger run have passed. Extended trajectory,
+timing, and all-slot validation remain pending.
 
 ## Applying the edit
 
@@ -102,19 +103,38 @@ The shared layer operates on explicit original-byte ownership regions. Future ed
 
 ## Runtime validation
 
-Pending. The first debugger run should remain bounded:
+The first bounded debugger run passed. The ignored run copy used an entry-point
+`INT 03` only to gain control before startup; the original two entry bytes were
+restored in guest memory before execution continued.
 
-1. Confirm the generated copy reaches the normal animated frontend without an illegal-instruction or divide-error stop.
-2. Enter a game, enable gravity, and check that frame and input responsiveness remain stable with two active ships.
-3. Exercise projectile creation so more active slots traverse the three-division routine.
-4. Break immediately after `CS:1E30` for representative coordinates and compare the low/high velocity deltas with the script model.
-5. Run a bounded trajectory comparison at far, initial, inner-softening, and center-adjacent positions.
+| Check | Runtime evidence | Result |
+|---|---|---|
+| Startup integrity | Execution continued from restored `CS:044C:0000` to the normal animated frontend. | Passed; no startup corruption or illegal-instruction stop |
+| Test mode | At the live-game entry, `DS:1076` was `03` and `DS:2040` was `02`. | Both players were computer controlled; gravity was enabled and the planet was hidden |
+| Initial left ship | Position `(160, 46)` with both velocity components cleared before one call at `CS:1E30`. | Observed `(+885, +295)`: high/low words `0000:0375`, `0000:0127`; exact model match |
+| Initial right ship | The unmodified right slot was processed in the same live timer path. | Observed `(-938, -227)`: high/low words `FFFF:FC56`, `FFFF:FF1D`; exact model match |
+| Controlled negative path | The left slot was placed at `(480, 138)` and its velocity was cleared before one call. | Observed `(-938, -227)`, including `FFFF` sign-extension words; exact model match |
+| Bounded instruction trace | Each controlled call traversed all three unsigned divisions, restored `BP` and `DI`, and returned to the timer caller. | No divide error, illegal instruction, unhandled interrupt, or stack fault |
+| CPU-play stress | The code breakpoints were removed, leaving only the deliberate startup `INT 03` breakpoint. The program then ran for approximately 140 seconds, spanning two CPU-versus-CPU rounds, visible projectile activity, and normal returns to the frontend. | No unexpected debugger stop; final pause was in the ordinary frontend loop |
+| Final option state | After the stress interval, `DS:1076` remained `03` and `DS:2040` remained `02`. | Player modes and gravity selection remained intact |
 
-The three unsigned `DIV` instructions per active entity are the main remaining timing risk. A normal frontend alone does not execute the gravity path; gravity must be enabled during live play before startup validation can be treated as a runtime gravity result.
+The source executable and generated gravity copy retained their pre-run SHA-256
+values. The debugger run copy intentionally had a different hash because its
+on-disk entry instruction remained replaced by `INT 03`; restoration occurred
+only in guest memory.
+
+This run validates startup, both acceleration sign directions, exact split-word
+velocity updates, ordinary CPU-only play, and a small amount of natural
+projectile activity. It does not yet prove worst-case timing with all sixteen
+entity slots active, test every projectile slot individually, measure missed
+timer deadlines or audio timing, or compare bounded trajectories at far,
+inner-softening, collision-boundary, and center-adjacent positions. The three
+unsigned `DIV` instructions per active entity therefore remain the main timing
+risk.
 
 ## Remaining decisions
 
-1. Decide whether the prototype strength and softening produce enjoyable trajectories after bounded testing.
+1. Decide whether the prototype strength and softening produce enjoyable trajectories after bounded trajectory testing.
 2. Decide whether projectiles should retain exactly the same field as ships.
 3. Measure or bound worst-case timer cost with all 16 entity slots active.
 4. Test the existing planet-collision boundary and center-adjacent states dynamically.

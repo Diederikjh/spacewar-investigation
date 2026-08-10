@@ -327,3 +327,4 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Refined the hyperspace animation as two independent 32-pixel slices of the shared 90-entry particle arrays, distinct from the 90-tile title and 90-pixel round-end effects.
 - Recorded destination selection, per-pixel random velocities, shared 16.16 drift, midpoint velocity negation, the exact 31/32 movement-step asymmetry, and restoration from the first particle near the selected destination.
 - Added `EDIT-HYPER-01` to preserve each ship's exact signed 16.16 entry velocity across hyperspace, including saved-state, code-placement, gravity, simultaneous-use, and round-transition validation requirements.
+- Completed the first bounded debugger validation of `EDIT-GRAV-01`: startup, positive and negative acceleration paths, exact split-word results, and two CPU-versus-CPU rounds passed without an unexpected debugger stop; worst-case timing and extended trajectory checks remain open.
