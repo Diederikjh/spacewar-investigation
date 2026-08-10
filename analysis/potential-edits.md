@@ -20,7 +20,7 @@ The original executable remains immutable. Detailed investigation findings remai
 
 | ID | Potential edit | Area | Status | Expected benefit | Main risk | Detailed source |
 |---|---|---|---|---|---|---|
-| `EDIT-GRAV-01` | More realistic gravity | Physics | Proposed; design pending | Replace the current spring-like field with a force that becomes stronger near the planet and weaker at long distance | Per-tick cost, near-center instability, fixed-point overflow, code space, and changed game balance | [Current gravity calculation](phase-6-findings.md#gravity-calculation) |
+| `EDIT-GRAV-01` | More realistic gravity | Physics | Prototype; static validation passed; runtime pending | Replace the current spring-like field with a force that becomes stronger near the planet and weaker at long distance | Per-tick division cost, near-center behavior, and changed game balance | [Prototype findings](edit-grav-01-findings.md) |
 | `EDIT-CPU-01` | Increase right weapon attempts | Computer player | Proposed; Phase 5 rank 1 | More frequent offensive weapon decisions through a one-byte threshold change | Faster energy use and more projectile activity | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-02` | Widen left proximity defense | Computer player | Proposed; Phase 5 rank 2 | Let the defensive player engage ships and projectiles from farther away | More distant low-priority phaser use | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-03` | Increase right pursuit thrust | Computer player | Proposed; Phase 5 rank 3 | Close distance more aggressively | Energy drain and overshoot | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
@@ -58,27 +58,27 @@ acceleration = gravity_strength * to_planet
 
 The softening term prevents a singularity and unbounded acceleration at the planet center. The formula describes the desired behavior, not a requirement to calculate a square root or division directly on every timer tick.
 
-### Likely implementation direction
+### Prototype implementation
 
-The practical 16-bit design should investigate a distance-banded or lookup-table approximation:
+The size-preserving prototype uses the investigated approximate-radius direction without a table:
 
 1. Take absolute X/Y displacement from the existing center.
 2. Approximate radius cheaply, for example `max(abs_x, abs_y) + min(abs_x, abs_y) / 2`.
-3. Quantize that radius into a bounded table index.
-4. Look up a softened distance-dependent scale.
-5. Apply the scale with reviewed fixed-point shifts to the signed X/Y direction.
+3. Add a softening radius of `32`.
+4. Calculate `scale = floor(262144 / denominator)`.
+5. Calculate each component as `floor(abs(component) * scale / denominator)` and restore its direction toward the center.
 
-This retains central symmetry while avoiding a per-entity square root and general division. Exact table values, fixed-point format, code placement, and cycle cost remain design questions. Replacing the current approximately 102-byte gravity routine and helper in place may be possible only for a very compact approximation; otherwise the executable-space strategies in [Phase 5](phase-5-findings.md#code-placement-constraint) apply.
+This retains central symmetry and avoids a square root, but it performs three unsigned divisions per active entity. The 111-byte replacement fits in the 102-byte old routine plus nine adjacent zero bytes, leaving `CS:1E9F` zero before the next routine at `CS:1EA0`. It does not use the trailing padding owned by the separate EDIT-CPU-05 prototype. Exact mapping, bounds, examples, and validation status are recorded in [the prototype findings](edit-grav-01-findings.md).
 
-### Decisions required before implementation
+### Prototype choices and remaining decisions
 
-- Choose the desired gravity strength and softening radius.
-- Decide whether ships and projectiles continue to receive identical acceleration.
-- Decide whether gravity remains independently selectable when the planet is hidden.
-- Decide how the field interacts with the existing square planet-collision region.
-- Set maximum acceleration and velocity policies that cannot overflow the signed 16.16 state.
+- The first prototype uses strength `262144` and softening radius `32`; gameplay tuning remains pending.
+- Ships and projectiles continue to receive identical acceleration.
+- Gravity remains independently selectable when the planet is hidden.
+- The existing square planet-collision behavior is unchanged and requires bounded runtime testing with the new field.
+- Exhaustive playable-coordinate validation bounds each component at `2048`; the existing absence of a velocity cap is unchanged.
 - Establish a cycle budget for up to 16 active entities at approximately 72.8 timer ticks per second.
-- Select code and table placement without assuming that physical file padding is currently loaded.
+- Decide whether later tuning is sufficient or whether a table-based approximation warrants a different code-space strategy.
 
 ### Validation criteria
 

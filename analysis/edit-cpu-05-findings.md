@@ -18,6 +18,8 @@ analysis/scripts/apply-edit-cpu-05.py \
 
 The script accepts only the investigated input hash, refuses to overwrite an existing output unless `--force` is given, refuses to use the same path for input and output, and aborts if its helper code exceeds the 108-byte physical padding. The output stays under `analysis/work/` and remains excluded from version control.
 
+Exact-input validation, region ownership, 8086 code building, checksum preservation, and atomic output are now provided by the shared `analysis/scripts/spacewar_edit.py` library introduced with EDIT-GRAV-01. Regenerating this edit after the refactor produces a byte-for-byte identical executable with the same patched SHA-256 recorded below.
+
 ## Behavior change
 
 For a target coordinate, origin coordinate, and world extent, the patch implements:

@@ -319,3 +319,5 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Expanded the Phase 6 `LiveGame` state into its foreground pipeline, independent control-mode combinations, human action surface, and distinct left and right computer-player policy blocks.
 - Implemented the size-preserving `EDIT-CPU-05` wrapped-aim prototype in the existing physical zero padding and recorded guarded patch generation, static validation, and a successful debugger startup smoke test.
 - Dynamically validated right-player X wrapping in both directions, right-player Y wrapping in one direction, and left-player wrapped ship proximity and aim with controlled adjacent-breakpoint experiments.
+- Implemented a size-preserving `EDIT-GRAV-01` softened-gravity prototype in the original gravity routine plus adjacent internal zeros; static size, ownership, division-bound, and checksum validation passed, while runtime validation remains pending.
+- Refactored exact-input guards, owned-region replacement, 8086 code building, checksum preservation, and atomic output into `analysis/scripts/spacewar_edit.py`; EDIT-CPU-05 still regenerates byte-for-byte identically.

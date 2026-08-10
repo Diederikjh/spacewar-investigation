@@ -12,6 +12,8 @@
 *.rep/
 
 # Emulator and tool noise.
+__pycache__/
+*.py[cod]
 LOGCPU.TXT
 *.log
 .DS_Store
