@@ -21,6 +21,7 @@ The original executable remains immutable. Detailed investigation findings remai
 | ID | Potential edit | Area | Status | Expected benefit | Main risk | Detailed source |
 |---|---|---|---|---|---|---|
 | `EDIT-GRAV-01` | More realistic gravity | Physics | Prototype; static validation passed; runtime pending | Replace the current spring-like field with a force that becomes stronger near the planet and weaker at long distance | Per-tick division cost, near-center behavior, and changed game balance | [Prototype findings](edit-grav-01-findings.md) |
+| `EDIT-HYPER-01` | Preserve ship velocity through hyperspace | Physics/gameplay | Proposed; design captured | Retain a ship's incoming momentum when it reappears instead of forcing it to rest | Saved-state placement, immediate post-arrival hazards, and interaction with gravity during absence | [Hyperspace particle cycle](phase-6-findings.md#hyperspace-particle-cycle) |
 | `EDIT-CPU-01` | Increase right weapon attempts | Computer player | Proposed; Phase 5 rank 1 | More frequent offensive weapon decisions through a one-byte threshold change | Faster energy use and more projectile activity | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-02` | Widen left proximity defense | Computer player | Proposed; Phase 5 rank 2 | Let the defensive player engage ships and projectiles from farther away | More distant low-priority phaser use | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-03` | Increase right pursuit thrust | Computer player | Proposed; Phase 5 rank 3 | Close distance more aggressively | Energy drain and overshoot | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
@@ -89,6 +90,51 @@ This retains central symmetry and avoids a square root, but it performs three un
 5. Exercise both ships and all fourteen projectile slots without missed timer deadlines or audio disruption.
 6. Compare representative trajectories with the current linear field using identical initial state and a bounded tick count.
 7. Tune one strength/table revision at a time and record the exact executable mapping and gameplay effect.
+
+## `EDIT-HYPER-01`: preserve ship velocity through hyperspace
+
+### Current behavior
+
+Hyperspace does not merely clear velocity when the ship returns. Its trigger first replaces the ship's four signed 16.16 velocity words with the common particle-cloud drift `(selected destination - previous rendered position) / 64`. The ship is inactive during the effect, so these words drive the shared movement of its 32-pixel slice rather than ordinary ship motion.
+
+When the effect completes, the timer copies the first particle's final coordinate into the ship's current and previous-rendered positions, marks the ship active, and writes zero to its X/Y velocity words. The ship therefore reappears at rest regardless of its momentum before hyperspace.
+
+### Proposed behavior
+
+Save the complete incoming X/Y velocity before the trigger overwrites it, continue using the existing temporary destination drift for the particle animation, and restore the saved velocity when the ship is reactivated:
+
+```text
+on hyperspace entry:
+    saved_velocity = ship_velocity
+    particle_drift = (selected_destination - previous_rendered_position) / 64
+    ship_velocity = particle_drift
+
+on hyperspace completion:
+    ship_position = first_particle_final_position
+    ship_velocity = saved_velocity
+```
+
+Preservation means exact signed 16.16 momentum at entry. The first design should not apply thrust, speed limiting, or accumulated gravity while the ship is inactive. Gravity and ordinary motion resume from the restored velocity on the next eligible gameplay timer tick.
+
+### Implementation questions
+
+- Reserve eight bytes per ship for the two low/high velocity pairs without conflicting with simultaneous left/right hyperspace, the title, or the 90-pixel round-end effect.
+- Investigate the 26 mutable particle entries unused by the two 32-entry hyperspace slices as possible temporary storage. A round ending during hyperspace may overwrite all 90 entries, but preserved velocity is then irrelevant unless control can return to the same live round.
+- Save velocity before either trigger writes its destination drift and restore it at both side-specific completion paths instead of writing zero.
+- Keep the existing random destination, 32-pixel animation, landing coordinate, energy cost, duration, and action-latch behavior unchanged.
+- Decide whether a post-arrival safety rule is needed when restored momentum immediately crosses a border or enters a collision region. The initial prototype should prefer unchanged normal movement and wrapping rules.
+- Re-evaluate code placement against other edits. The saved-state area may be shared data, but trigger and completion hooks still require instructions and explicit ownership.
+
+### Validation criteria
+
+1. Seed positive, negative, mixed-sign, zero, and fractional X/Y velocities and confirm exact bit-for-bit restoration for both ships.
+2. Confirm that particle paths, counter boundaries, random-call cadence, selected destination, and final landing coordinate remain identical to an unmodified reference run.
+3. Trigger left and right hyperspace simultaneously and prove that their saved velocities and 32-pixel slices do not overlap.
+4. Confirm that zero incoming velocity still produces the original at-rest re-entry behavior.
+5. Exercise re-entry near every border and near the planet with gravity disabled and enabled; ordinary wrapping, collision, and gravity should resume only after reactivation.
+6. Verify computer-player hyperspace uses the same preserved-momentum path without changing its probability, energy, or latch policy.
+7. Trigger a round end while one ship is absent and confirm that temporary saved-state reuse cannot leak into the frontend or a later round.
+8. Preserve physical EXE size unless a separately reviewed code-space plan explicitly permits expansion.
 
 ## Computer-player difficulty proposals
 
