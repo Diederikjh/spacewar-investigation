@@ -321,3 +321,8 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Dynamically validated right-player X wrapping in both directions, right-player Y wrapping in one direction, and left-player wrapped ship proximity and aim with controlled adjacent-breakpoint experiments.
 - Implemented a size-preserving `EDIT-GRAV-01` softened-gravity prototype in the original gravity routine plus adjacent internal zeros; static size, ownership, division-bound, and checksum validation passed, while runtime validation remains pending.
 - Refactored exact-input guards, owned-region replacement, 8086 code building, checksum preservation, and atomic output into `analysis/scripts/spacewar_edit.py`; EDIT-CPU-05 still regenerates byte-for-byte identically.
+
+### 2026-08-10
+
+- Refined the hyperspace animation as two independent 32-pixel slices of the shared 90-entry particle arrays, distinct from the 90-tile title and 90-pixel round-end effects.
+- Recorded destination selection, per-pixel random velocities, shared 16.16 drift, midpoint velocity negation, the exact 31/32 movement-step asymmetry, and restoration from the first particle near the selected destination.

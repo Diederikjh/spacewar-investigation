@@ -207,7 +207,7 @@ Gameplay pause changes both contexts. The foreground stops at its key-polling ta
 
 ### Hyperspace and destruction
 
-Hyperspace and destruction are per-entity substates rather than separate top-level modes. Hyperspace makes one ship inactive for ordinary control and uses the shared particle arrays until the timer restores it at new bounded coordinates. A negative entity state is consumed by the foreground destruction-effect loop until that slot is cleared or restored by the relevant transition.
+Hyperspace and destruction are per-entity substates rather than separate top-level modes. Hyperspace makes one ship inactive for ordinary control, chooses a bounded random destination, and uses a side-specific 32-pixel slice of the shared particle arrays until the timer restores it near that destination. A negative entity state is consumed by the foreground destruction-effect loop until that slot is cleared or restored by the relevant transition.
 
 ## Startup and platform lifecycle
 
@@ -319,11 +319,41 @@ The handler at `CS:233D` performs:
 7. On tick-byte wrap, recharge eligible nonzero weapon-energy bytes toward their signed maximum.
 8. Every 16 ticks, decrement active projectile lifetimes in the two seven-slot pools.
 9. Advance phaser cooldowns and update the PC-speaker state machine.
-10. Advance any active left/right hyperspace particle effect and restore the ship when its effect completes.
+10. Advance any active left/right 32-pixel hyperspace effect and restore the ship when its effect completes.
 11. Every 16 ticks, animate the enabled planet.
 12. Acknowledge the PIC, restore the saved state, and `IRET`.
 
 The timer produces new coordinates, resource values, and dirty flags. The foreground consumes them, but it also produces action flags, projectile activations, damage, and transitions. The architecture is therefore cooperative shared-state concurrency rather than a strict one-way producer/consumer pipeline.
+
+### Hyperspace particle cycle
+
+The hyperspace effect shares storage with the frontend title and round-end particles, but it is a distinct timer-driven animation. It uses 32 single-pixel entries per side rather than all 90 entries or the title's 16-by-8 glyphs:
+
+| Ship | Mutable-array byte indices | Effect counter |
+|---|---:|---:|
+| Left | `00..3E` | `DS:0060` |
+| Right | `40..7E` | `DS:0061` |
+
+The trigger sequence is:
+
+1. Make the ship inactive and clear its ordinary dirty-render state.
+2. Select accepted random X/Y coordinates.
+3. Encode `(selected - previous_rendered) / 64` as a shared signed 16.16 drift.
+4. Place all 32 pixels at the previous rendered ship coordinate.
+5. Give every pixel separately generated raw pseudorandom X/Y velocity words, draw them, and start the side-specific counter at one.
+
+For counter movement steps, the gameplay timer combines each pixel's stored random velocity with the common destination drift:
+
+```text
+particle_x += 2 * random_velocity_x + shared_drift_x
+particle_y += 4 * random_velocity_y + shared_drift_y
+```
+
+Coordinates wrap across the full `640 x 200` screen. At old counter value `20h`, all stored random velocity components are negated before that tick's movement, while the common drift continues unchanged. At old value `40h`, the timer erases the 32 pixels, clears the counter, reactivates the ship, copies the first particle's final position into both current and previous-rendered ship coordinates, and zeroes ship velocity.
+
+The counter boundary makes the exact trajectory slightly asymmetric: 31 movement steps use the original random components, 32 use their negations, and the shared destination drift runs for 63 steps. The particles therefore converge near the initially selected destination rather than mathematically meeting at it. One reversed random step remains in each particle's final displacement, and the first particle determines the actual restored ship coordinate.
+
+This differs from both other users of the arrays. The frontend title disperses 90 glyph tiles for 30 foreground frames and exactly reverses them for 30 frames to reconstruct `SPACEWAR`; the round-end effect moves all 90 entries as pixels for 128 foreground frames and then erases them. Hyperspace uses neither routine even though the mutable storage and random-velocity initializer are shared.
 
 ### Gravity calculation
 
@@ -370,7 +400,7 @@ The initialized load-module base is the program's main `DS` and private `SS`. Th
 | `DS:` range or base | Architectural role |
 |---|---|
 | `0000..0166` | Platform variables plus the downward-growing private stack ending at `0166` |
-| `0171..07C4` | Fixed and mutable 90-particle title/round-effect arrays |
+| `0171..07C4` | Fixed and mutable 90-entry particle arrays shared by the title, two 32-pixel hyperspace slices, and the round-end effect |
 | `0950..0CAF` | Embedded round-state template |
 | `0CBC..101B` | Live copied round/entity state |
 | `1060..1084` | Shared display segment, vectors, options/latches, tick, and scores |
@@ -424,7 +454,7 @@ Computer players enter through the same per-side control dispatchers as humans, 
 
 ### Random service
 
-One five-byte additive/carry generator serves every consumer. Startup seeds four bytes from the BIOS tick count and retains the initially zero fifth byte. Callers independently interpret the returned word: rejecting coordinate helpers, raw threshold tests, masked hyperspace gates, title velocities, round-effect velocities, or a randomized speaker divisor. Reproducibility therefore depends on both the initial five-byte state and the complete intervening call order.
+One five-byte additive/carry generator serves every consumer. Startup seeds four bytes from the BIOS tick count and retains the initially zero fifth byte. Callers independently interpret the returned word: rejecting coordinate helpers, raw threshold tests, masked hyperspace gates, shared hyperspace/round-effect velocities, title velocities, or a randomized speaker divisor. Reproducibility therefore depends on both the initial five-byte state and the complete intervening call order.
 
 ### Audio
 

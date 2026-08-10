@@ -222,7 +222,8 @@ The direct consumers do not use one universal range operation. They interpret ra
 | Right robot decisions | `CS:06B0`, `CS:06C0`, `CS:06E4` | Tests raw `AL < 0x10`, raw `AL < 0x08`, then `(AX & 0x03FF) == 0`; the extra right-side draw is a Phase 5 handoff question |
 | Left hyperspace | `CS:0700`, `CS:071B` | Uses the rejecting X and Y coordinate helpers |
 | Right hyperspace | `CS:0763`, `CS:077E` | Uses the same X and Y coordinate helpers |
-| Round-end effects | `CS:087F`, `CS:08D3`, `CS:08DA` | Uses one bit from `AH` for sound and raw words for two star-velocity components |
+| Round-end sound choice | `CS:087F` | Uses one bit from `AH` for sound |
+| Shared hyperspace/round-effect velocity initializer | `CS:08D3`, `CS:08DA` | Stores raw words as two pixel-velocity components; hyperspace initializes a 32-entry side-specific slice and round end initializes all 90 entries |
 | Frontend background | `CS:0956` | Draws 512 pixels through the coordinate helpers |
 | Frontend title-particle velocities | `CS:0A48`, `CS:0A51` | Arithmetic-shifts each raw word right once before storing signed X/Y velocity components |
 | Game background | `CS:1F3C` | Draws another 512 pixels through the coordinate helpers |
@@ -248,7 +249,7 @@ The earlier `starfield` and `xor_star` proposals remain useful navigation names,
 
 ### Nine parallel particle arrays
 
-The title and round-end effects share a compact structure-of-arrays block. Each array contains 90 words, occupies `0xB4` bytes, and is selected with the same even byte index `SI=0..0xB2`.
+The title, hyperspace, and round-end effects share a compact structure-of-arrays block. Each array contains 90 words, occupies `0xB4` bytes, and is selected with an even byte index. The title and round-end paths can use all entries at `SI=0..0xB2`; left and right hyperspace reserve separate 32-entry slices within the mutable arrays.
 
 | Initialized `DS:` base | Role | Image state |
 |---:|---|---|
@@ -313,6 +314,37 @@ The velocity initializer waits, runs one 30-frame outward animation, negates all
 
 The animation is foreground work rather than timer-driven work. Its only per-tile synchronization call waits while paused; the separate delay wrapper provides the longer holds between frontend displays.
 
+### Hyperspace reuse of two 32-pixel slices
+
+Hyperspace reuses the six mutable position, fraction, and velocity arrays, but it does not use the 90 fixed title positions, the glyph selectors, or the title's foreground animation routine. Each ship has a separate 32-pixel slice:
+
+| Ship | Particle byte indices | Counter | Trigger |
+|---|---:|---:|---:|
+| Left | `00..3E` | `DS:0060` | `CS:06F6` |
+| Right | `40..7E` | `DS:0061` | `CS:0759` |
+
+The trigger first makes the ship inactive for ordinary control and rendering. It then chooses a bounded random destination through the shared X/Y coordinate helpers and calculates a signed 16.16 drift from the ship's previous rendered position to that destination:
+
+```text
+shared_drift_x = (selected_x - old_rendered_x) / 64
+shared_drift_y = (selected_y - old_rendered_y) / 64
+```
+
+The integer delta is encoded exactly as a split 16.16 value by shifting its signed quotient into the high word and its remainder into the low word. The shared initializer at `CS:08B9` places all 32 pixels at the old rendered ship position, clears their fractional words, and stores two raw pseudorandom 16-bit words as each pixel's X/Y velocity. The trigger draws the initial pixels and advances the side-specific counter from zero to one.
+
+The gameplay timer owns the remaining animation. On each movement step it XOR-erases a pixel, adds both its random component and the common destination drift, wraps the resulting integer coordinate, and XOR-redraws it:
+
+```text
+particle_x += 2 * random_velocity_x + shared_drift_x
+particle_y += 4 * random_velocity_y + shared_drift_y
+```
+
+When the old counter value is `20h`, the timer negates all 32 stored random X/Y velocities before moving the pixels. The common destination drift is not negated. When the old value is `40h`, it erases the particles without another movement step, clears the effect counter, marks the ship active and dirty, and restores the ship at the first particle's final coordinate with zero velocity.
+
+Because the trigger starts the counter at one and the timer compares the old value after incrementing the stored counter, the exact movement count is 31 steps with the original random velocities and 32 with their negations. The common destination drift is applied 63 rather than 64 times. Random motion therefore has a one-step residual, and the selected destination is an attractor rather than the exact restored coordinate. The first particle finishes near that destination, modulo screen wrapping, and determines the actual landing point.
+
+This is an engineered spread-and-converge effect, not the title animation. The random-looking paths come from the shared deterministic generator; replay requires the same five-byte generator state and intervening call history.
+
 ### Round-end reuse of the mutable arrays
 
 The round-end path at runtime `CS:07FC` reuses the six mutable position, fraction, and velocity arrays but not the fixed title positions or glyph selectors. Runtime `CS:08B4` places all 90 particles at one selected ship's previous rendered position, clears their fractional words, and stores two raw random words as signed velocities.
@@ -325,14 +357,15 @@ The 512-pixel background at runtime `CS:2932` is a third system. It does not use
 
 The frontend calls it at `CS:0956` after clearing the framebuffer. Game initialization calls it again at `CS:1F3C`, also after a clear and before status elements are drawn. The points then persist because their coordinates are not retained for movement or later erasure. As established in P4-04, duplicate coordinates are possible and XOR parity determines whether a multiply selected point remains visible.
 
-| Property | Frontend title | Round-end effect | Random background |
-|---|---|---|---|
-| Elements | 90 glyph tiles | 90 pixels | 512 draw attempts |
-| Stored coordinates | Shared six mutable arrays | Same six arrays reused | None |
-| Initial geometry | Fixed `SPACEWAR` template | One ship position | Random accepted X/Y |
-| Motion | 30 frames out, 30 back | 128 wrapped frames | None |
-| Renderer | 16-by-8 XOR glyph | XOR pixel | XOR pixel |
-| Boundary policy | Margins make wrapping unnecessary | Wrap `640 x 200` | Reject outer eight-pixel border |
+| Property | Frontend title | Hyperspace | Round-end effect | Random background |
+|---|---|---|---|---|
+| Elements | 90 glyph tiles | 32 pixels per ship | 90 pixels | 512 draw attempts |
+| Stored coordinates | All six mutable arrays | Left/right slices of the same arrays | All six arrays reused | None |
+| Initial geometry | Fixed `SPACEWAR` template | Previous rendered ship position | One ship position | Random accepted X/Y |
+| Motion | 30 frames out, 30 back | 31 spread steps, then 32 reversed steps with continuous destination drift | 128 wrapped frames | None |
+| End state | Exact title reconstruction | Restore ship at first particle near selected destination | Final XOR erase | Persistent pixels |
+| Renderer | 16-by-8 XOR glyph | XOR pixel | XOR pixel | XOR pixel |
+| Boundary policy | Margins make wrapping unnecessary | Wrap `640 x 200` | Wrap `640 x 200` | Reject outer eight-pixel border |
 
 ### Confidence and handoff
 
