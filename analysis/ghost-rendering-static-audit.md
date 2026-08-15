@@ -42,6 +42,25 @@ effect was away from the planet location. Planet drawing, gravity-independent
 planet collision, and the planet's direct-writer renderer are not priority
 candidates for the first runtime check.
 
+### Informal runtime update
+
+After this audit was planned, an informal comparison of approximately five
+CPU-versus-CPU runs using a gravity-edited build and the original executable
+suggested that roughly 30% of launches involving early hyperspace showed the
+ghost effect. This is a useful reproduction clue, not a measured incidence
+rate: the exact build hashes, number of runs per build, number of hyperspace
+events, event-by-event outcomes, and whether the estimate refers to runs or
+individual launches were not recorded.
+
+The observation strengthens the association with hyperspace shortly after game
+entry and weakens explanations that require a planet interaction or an observed
+round transition. If the effect is visible immediately around entry, it also
+fits the definite deferred-erase window better than the conditional completion
+failure, which would require the ordinary erase to remain missing across the
+full hyperspace cycle. The original executable's inclusion in the comparison is
+important, but it is not yet evidence that the original independently exhibited
+the effect until the per-build outcomes are separated.
+
 ## State involved
 
 | State | Left | Right | Role |
@@ -225,7 +244,7 @@ in that iteration.
 
 | Rank | Candidate | Static confidence | Match to observations | Minimal next check |
 |---:|---|---|---|---|
-| 1 | Deferred ordinary-ship erasure lets a timer movement display hyperspace particles while the old sprite remains | High | Plausible for a brief blip immediately after hyperspace; insufficient alone for lasting duplicates | Observe visibility parity at counter activation, first particle tick, and the next inactive foreground erase |
+| 1 | Deferred ordinary-ship erasure lets a timer movement display hyperspace particles while the old sprite remains | High | Strengthened by the informal association with early hyperspace; insufficient alone for lasting duplicates | Observe visibility parity at counter activation, first particle tick, and the next inactive foreground erase |
 | 2 | Completion occurs while the ordinary visibility bit is still one, then overwrites the old render snapshot | High consequence; low confidence that normal scheduling reaches it | Would explain a stranded sprite while logic follows the restored real ship | Break only at the side-specific completion entry and inspect the visibility bit and previous-rendered state |
 | 3 | Round-end foreground animation races an active timer hyperspace effect in the shared 90-entry arrays | High | Strong code defect but weak report match without a round transition | Test only if a sighting correlates with death/score transition, or later as a separate bounded case |
 | 4 | Simultaneous CPU hyperspace leaves both old ordinary sprites visible for one foreground iteration | High | Could contribute to CPU-versus-CPU blip; does not explain the human-versus-right report if only right hyperspaced | Record both counters and visibility bits at entry |
@@ -237,6 +256,12 @@ in that iteration.
 
 The audit does not justify heavy state capture as the first runtime action. Use
 the existing debugger workflow for these bounded checks:
+
+Before interpreting another percentage, keep a one-line local record per run:
+exact executable hash, options, play mode, elapsed time to each hyperspace entry,
+side, whether the effect appeared, whether it persisted beyond the particle
+cycle, and whether a round transition occurred. Report numerator and denominator
+separately for each build.
 
 1. Rehearse the right-side lifecycle on an original-based run copy. At
    `CS:07B6`, immediately after counter activation, record `DS:0061`, `0E2C`,
