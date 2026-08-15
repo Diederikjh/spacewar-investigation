@@ -280,6 +280,13 @@ strong candidate, instrument only that transition. Proceed to broad circular
 logging only if the audit leaves multiple plausible timing windows or cannot
 distinguish the original from edited behavior.
 
+The completed audit and its ranked candidates are recorded in
+[the ghost-rendering static audit](ghost-rendering-static-audit.md). It found a
+definite deferred ordinary-ship erase at hyperspace entry, a conditional stranded
+sprite if completion sees the visibility bit still set, and a separate round-end
+particle-array race. The next gate is a narrow visibility-bit lifecycle check,
+not broad state capture.
+
 #### Logging-first reproduction plan
 
 After the focused audit, use a staged approach so repeated attempts remain
@@ -375,7 +382,7 @@ foreground timing and the complete intervening random-call order also matter.
 
 #### Execution checklist
 
-- [ ] Complete the focused static audit and produce a ranked list of exact candidate transitions before designing broad instrumentation.
+- [x] Complete the focused static audit and produce a ranked list of exact candidate transitions before designing broad instrumentation. See [the static audit](ghost-rendering-static-audit.md).
 - [ ] Recover or regenerate each observed edited build from its patcher and record its exact hash; do not rely on a descriptive filename.
 - [ ] Build a local batch runner and compact run-manifest format, with all raw outputs kept under ignored paths.
 - [ ] Define the fixed-width event schema and local decoder before instrumenting an executable, including explicit segment/range ownership for the circular buffer.
@@ -495,4 +502,5 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 
 - Implemented an expanded `EDIT-CPU-06` photon-leading prototype for the right computer player. It uses exact signed 16.16 target-minus-shooter velocity over a 64-tick horizon and a constant-relative-acceleration correction for the original linear gravity field. The helper uses the 108-byte padding plus a guarded 16-byte same-segment append; static validation and a bounded gravity-enabled CPU-play smoke test pass while controlled calculation and tuning checks remain open.
 - Expanded the intermittent ghost-ship investigation after sightings on both the earlier lead-only build and the gravity-aware lead build. Both sightings had the planet disabled and occurred away from its location. A focused hyperspace/dirty-redraw static audit now gates runtime instrumentation; any remaining work compares exact edited hashes against original controls, measures matched hyperspace exposure, captures live data and CGA memory, retains compact circular event history, and uses locally parsed anomaly windows efficiently.
+- Completed the focused static gate. It found a definite one-foreground-pass deferred erase at hyperspace entry, a conditional stranded-sprite sequence if completion finds the ordinary visibility bit set, and an independently real round-end/hyperspace particle-array race. It found no direct rendering-state write or code overlap in either lead patch and reduced the next runtime work to a small visibility-bit lifecycle check.
 - Added `EDIT-CPU-09` trouble-aware hyperspace and `EDIT-CPU-10` confidence-gated photons as energy-efficiency proposals.
