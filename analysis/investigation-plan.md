@@ -259,10 +259,32 @@ matched reproduction setup.
 - Did an edit overwrite code or data, or did its extra foreground work alter the interrupt timing between erase, snapshot, and redraw operations?
 - Why are both ships affected after one right-side hyperspace event? Prioritize shared rendering state, the shared particle arrays, foreground/timer coordination, and whole-screen transitions over a right-player targeting-state explanation.
 
+#### First step: focused static audit
+
+Before building a large state-capture system, carefully re-read the hyperspace
+and dirty-redraw paths from several directions. The first goal is to find a
+specific ordering, timing, or shared-state hazard that can narrow later logging.
+
+- Follow each left/right hyperspace trigger from its caller through ordinary-ship erasure, entity deactivation, dirty-state clearing, particle initialization, and the first particle draw. Verify which position and angle snapshot is considered visible at every step.
+- Follow the gameplay timer from every hyperspace counter boundary, especially entry, velocity reversal, final particle erasure, coordinate restoration, entity reactivation, and dirty-state setting.
+- Follow the foreground dirty-render sequence in both directions: from a timer update into erase/snapshot/redraw, and backward from every ship XOR call to the state that authorized it.
+- Enumerate every interrupt-enabled window between an XOR erase and its matching redraw. Check whether the timer can deactivate, restore, move, or dirty either ship during that window and whether the short `CLI` section protects the complete invariant or only the snapshot copy.
+- Audit the two 32-entry hyperspace slices and the surrounding shared 90-entry particle arrays for overlap, stale indices, wrong-side base selection, simultaneous-use interactions, and reuse during round or mode transitions.
+- Compare left and right trigger/completion paths instruction by instruction for asymmetric state updates, missing erases, or a shared byte written with the wrong side offset.
+- Reconstruct XOR parity for normal movement immediately before, during, and after hyperspace. Pay particular attention to paths that clear dirty or entity state before the previous ship image has been erased, or reactivate a ship without synchronizing current and previous-rendered state.
+- Review the lead-only and expanded gravity-aware patch ranges, branches, register preservation, and new execution time against the original rendering and hyperspace paths. Confirm that no owned range, fall-through path, stack use, or shared register can directly corrupt them.
+
+Record candidate defects with an exact instruction range, event ordering, affected
+state bytes, and a minimal proposed runtime check. If this audit identifies a
+strong candidate, instrument only that transition. Proceed to broad circular
+logging only if the audit leaves multiple plausible timing windows or cannot
+distinguish the original from edited behavior.
+
 #### Logging-first reproduction plan
 
-Use a staged approach so repeated attempts remain inexpensive and the
-instrumentation does not obscure the behavior it is intended to capture.
+After the focused audit, use a staged approach so repeated attempts remain
+inexpensive and the instrumentation does not obscure the behavior it is intended
+to capture.
 
 1. Establish controls. Run the original executable, the exact lead-only output,
    and the expanded gravity-aware output. Begin with human versus right computer
@@ -353,6 +375,7 @@ foreground timing and the complete intervening random-call order also matter.
 
 #### Execution checklist
 
+- [ ] Complete the focused static audit and produce a ranked list of exact candidate transitions before designing broad instrumentation.
 - [ ] Recover or regenerate each observed edited build from its patcher and record its exact hash; do not rely on a descriptive filename.
 - [ ] Build a local batch runner and compact run-manifest format, with all raw outputs kept under ignored paths.
 - [ ] Define the fixed-width event schema and local decoder before instrumenting an executable, including explicit segment/range ownership for the circular buffer.
@@ -471,5 +494,5 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 ### 2026-08-15
 
 - Implemented an expanded `EDIT-CPU-06` photon-leading prototype for the right computer player. It uses exact signed 16.16 target-minus-shooter velocity over a 64-tick horizon and a constant-relative-acceleration correction for the original linear gravity field. The helper uses the 108-byte padding plus a guarded 16-byte same-segment append; static validation and a bounded gravity-enabled CPU-play smoke test pass while controlled calculation and tuning checks remain open.
-- Expanded the intermittent ghost-ship investigation after sightings on both the earlier lead-only build and the gravity-aware lead build. Both sightings had the planet disabled and occurred away from its location. The logging-first plan compares exact edited hashes against original controls, measures matched hyperspace exposure, captures live data and CGA memory, retains compact circular event history, and uses locally parsed anomaly windows to test XOR, hyperspace, and foreground/timer hypotheses efficiently.
+- Expanded the intermittent ghost-ship investigation after sightings on both the earlier lead-only build and the gravity-aware lead build. Both sightings had the planet disabled and occurred away from its location. A focused hyperspace/dirty-redraw static audit now gates runtime instrumentation; any remaining work compares exact edited hashes against original controls, measures matched hyperspace exposure, captures live data and CGA memory, retains compact circular event history, and uses locally parsed anomaly windows efficiently.
 - Added `EDIT-CPU-09` trouble-aware hyperspace and `EDIT-CPU-10` confidence-gated photons as energy-efficiency proposals.
