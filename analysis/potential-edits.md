@@ -27,7 +27,7 @@ The original executable remains immutable. Detailed investigation findings remai
 | `EDIT-CPU-03` | Increase right pursuit thrust | Computer player | Proposed; Phase 5 rank 3 | Close distance more aggressively | Energy drain and overshoot | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-04` | Reduce right random escapes | Computer player | Proposed; Phase 5 rank 4 | Keep the pursuing player in combat more often | Hyperspace may currently provide useful defense | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-05` | Use shortest wrapped deltas | Computer player | Prototype; bounded ship-target behavior passed; extended validation pending | Correct edge-crossing aim and proximity errors | New code space and careful signed wrap arithmetic | [Prototype findings](edit-cpu-05-findings.md) |
-| `EDIT-CPU-06` | Add target leading | Computer player | Proposed; Phase 5 rank 6 | Improve attacks against moving targets | High implementation and tuning complexity; trajectory prediction must follow the active gravity model | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
+| `EDIT-CPU-06` | Add photon-oriented target leading | Computer player | Prototype; static validation passed; runtime pending | Improve right-player photon aim against moving targets while retaining current-position phaser and gravity behavior | Fixed-horizon tuning, pursuit side effects, raw edge geometry, and shared code-space ownership with `EDIT-CPU-05` | [Prototype findings](edit-cpu-06-findings.md) |
 | `EDIT-CPU-07` | Improve left target selection | Computer player | Proposed; Phase 5 rank 7 | Avoid first-slot distractions and make defense more deliberate | Changes the left player's established defensive character | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-08` | Honour cloak while targeting | Computer player | Investigation pending; design captured | Prevent computer players from seeing a cloaked ship while retaining visible-projectile reactions | Separate left/right policy changes, random-call cadence, and code placement | [Deferred cloak-aware targeting](phase-5-findings.md#deferred-follow-up-cloak-aware-targeting) |
 
@@ -147,3 +147,9 @@ The ranking is an experiment order, not permission to combine edits. The recomme
 Target leading cannot assume constant straight-line velocity when gravity is enabled. A trajectory predictor must use the active gravity policy: the current linear field documented in [Phase 6](phase-6-findings.md#gravity-calculation), or the softened distance-dependent field if `EDIT-GRAV-01` is implemented. It must also respect the gameplay timer's order of operations: position and wrapping occur before gravity changes velocity for the following tick.
 
 Both the target ship and the fired projectile receive gravity, so predicting only the ship's curved path would still produce an incorrect intercept. A first proof of concept should either be explicitly scoped to gravity-off play or advance target and projectile state through the same bounded fixed-point tick model used by the executable. Any later gravity edit must therefore trigger revalidation of `EDIT-CPU-06` trajectory and intercept tests.
+
+The first prototype takes the gravity-off route and is documented in
+[the EDIT-CPU-06 findings](edit-cpu-06-findings.md). It applies a 64-tick
+relative-velocity lead only to the right player at photon-like distances and
+falls back to current-position aim when gravity is enabled. The left policy is
+unchanged because it only fires the instantaneous phaser.

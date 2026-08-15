@@ -57,6 +57,7 @@ that further validation may still be required.
 | Edit | Purpose | Current status | Findings |
 |---|---|---|---|
 | `EDIT-CPU-05` | Make both computer players aim and perform proximity checks using the shortest wrapped X/Y deltas. | Size-preserving prototype; static checks, startup, and bounded controlled ship-target behavior passed. Extended behavior validation remains. | [Wrapped-aim findings](analysis/edit-cpu-05-findings.md) |
+| `EDIT-CPU-06` | Lead the right player's photon-oriented aim using target-minus-shooter velocity over a fixed horizon. | Size-preserving standalone prototype; static validation passed. Runtime and tuning validation remain. | [Photon-leading findings](analysis/edit-cpu-06-findings.md) |
 | `EDIT-GRAV-01` | Replace the original spring-like gravity with a softened field that weakens at long range. | Size-preserving prototype; static checks, exact positive/negative debugger calculations, and bounded CPU-versus-CPU runtime passed. Worst-case timing and extended trajectory validation remain. | [Softened-gravity findings](analysis/edit-grav-01-findings.md) |
 | `EDIT-HYPER-01` | Preserve each ship's signed 16.16 velocity across hyperspace instead of restoring it at rest. | Proposed; behavior, storage questions, interactions, and validation criteria are captured, but no executable edit has been made. | [Hyperspace proposal](analysis/potential-edits.md#edit-hyper-01-preserve-ship-velocity-through-hyperspace) |
 

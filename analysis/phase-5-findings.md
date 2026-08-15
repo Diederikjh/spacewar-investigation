@@ -187,7 +187,10 @@ The timer can also interrupt between separate foreground reads of X and Y. The r
 
 ## Difficulty modifications
 
-These are investigation candidates only. No executable was modified. Any proof of concept must be separately reviewed and applied only to an ignored run copy.
+At the completion of Phase 5 these were investigation candidates only and no
+executable had been modified. Later work produced separately documented,
+ignored-run-copy prototypes for `EDIT-CPU-05` and `EDIT-CPU-06`; the table below
+remains the original ranking and design handoff.
 
 The seven candidates are also indexed as `EDIT-CPU-01` through `EDIT-CPU-07` in the [potential edits ledger](potential-edits.md). This Phase 5 section remains the detailed source for their ranking, constants, expected effects, and risks.
 
@@ -198,7 +201,7 @@ The seven candidates are also indexed as `EDIT-CPU-01` through `EDIT-CPU-07` in 
 | 3 | Increase right pursuit thrust | `CS:06B3` compares `AL` with `10` | Change the immediate to `20` | Doubles the accepted raw-byte set and should close distance faster because right aim already points at the opponent | Right | Low code risk; higher energy drain and overshoot risk |
 | 4 | Reduce right random escapes | `CS:06E7` masks `AX` with `03FF` | Try mask `07FF` | Halves the masked-zero set under a uniform reference, preserving pursuit and eight energy units more often | Right | Low code risk but uncertain gameplay benefit; hyperspace can also be defensive |
 | 5 | Use shortest wrapped deltas | Both bearing blocks and their `0x60` proximity tests | Normalize X over `640` and Y over `200` before absolute value and bearing | Removes predictable edge mis-aim and missed close threats | Both | Medium/high implementation risk; needs new code space and careful signed arithmetic |
-| 6 | Add target leading | Right targets current ship position; left targets current entity position | Incorporate target velocity and projectile travel time before bearing | Improves shots against moving targets | Both, with different target state | High implementation and tuning risk |
+| 6 | Add target leading | Right targets current ship position; left targets current entity position | Incorporate target velocity and projectile travel time before bearing; the later first prototype narrows this to right-player photon-oriented leading because the left phaser is instantaneous | Improves photon shots against moving targets | Right in the first prototype | High implementation and tuning risk; [prototype findings](edit-cpu-06-findings.md) |
 | 7 | Improve left target selection | `CS:03B2` accepts the first close slot | Score proximity or closing velocity, or add an opponent pursuit fallback | Avoids slot-order distractions and makes the left robot a more capable general opponent | Left | High implementation risk and changes its defensive identity |
 
 Rank 1 is the best first experiment: it changes one immediate byte, preserves the existing policy, is independently reversible in an ignored copy, and has an observable outcome. Rank 2 is the clearest left-side counterpart. Combining changes before measuring them would make effects harder to attribute.
