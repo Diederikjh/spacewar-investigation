@@ -226,6 +226,21 @@ Begin these only after the Phase 6 architecture document has been captured and r
 
 Potential executable changes are centrally indexed in the [potential edits ledger](potential-edits.md). Ledger entries are proposals only and require separate review before implementation.
 
+### Intermittent ghost-ship rendering
+
+A CPU-versus-CPU observation showed a brief visible duplicate or stale rendering
+of both ships while the computer players continued responding to the real ship
+state. Treat this as an unconfirmed rendering defect until it can be reproduced;
+the observation suggests visual state diverged from the live entity arrays
+rather than a second logical ship being created.
+
+- [ ] Reproduce the blip under bounded CPU-versus-CPU runs and record the active options, transition, hyperspace, collision, and destruction state immediately before it appears.
+- [ ] Distinguish a stale ship sprite from a background pixel cluster, particle effect, emulator presentation artefact, or an XOR erase/redraw at two valid adjacent positions.
+- [ ] Correlate current position, previous-rendered position, current/previous angle, dirty state, cloak, entity state, and hyperspace counter for both ship slots.
+- [ ] Investigate whether a gameplay timer interrupt between foreground erase, snapshot, and redraw steps can leave an unmatched XOR sprite despite the existing short `CLI` snapshot section.
+- [ ] Check frontend/game, pause, hyperspace, round-end, and destruction transitions for paths that clear or replace state without erasing the last visible ship image.
+- [ ] Recover the minimal event sequence, the condition that clears the ghost, and whether the issue exists in the original executable or only a particular prototype.
+
 ### Cloak-aware computer-player targeting
 
 - [ ] Confirm whether projectiles fired by a cloaked ship remain independently visible and targetable; the current recommendation is yes.
@@ -331,4 +346,6 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 
 ### 2026-08-15
 
-- Implemented a standalone, size-preserving `EDIT-CPU-06` photon-leading prototype for the right computer player. It uses exact signed 16.16 target-minus-shooter velocity over a 64-tick horizon, retains current-position aim at phaser range and under gravity, fills the 108-byte promoted padding, and passes static validation; bounded runtime and tuning checks remain open.
+- Implemented an expanded `EDIT-CPU-06` photon-leading prototype for the right computer player. It uses exact signed 16.16 target-minus-shooter velocity over a 64-tick horizon and a constant-relative-acceleration correction for the original linear gravity field. The helper uses the 108-byte padding plus a guarded 16-byte same-segment append; static validation and a bounded gravity-enabled CPU-play smoke test pass while controlled calculation and tuning checks remain open.
+- Added a post-design investigation for the observed intermittent ghost-ship rendering blip, focusing on XOR erase/snapshot/redraw state and timer/foreground interaction.
+- Added `EDIT-CPU-09` trouble-aware hyperspace and `EDIT-CPU-10` confidence-gated photons as energy-efficiency proposals.

@@ -304,6 +304,13 @@ The cloak design is likely to fit in 108 bytes: it needs two entry hooks, a left
 
 If 108 bytes are insufficient, the physical file can be extended and the MZ page-count and final-page fields recomputed. The current code ends at `CS:2AE3`, leaving `0xD51C` bytes before the 16-bit near-offset boundary at `CS:FFFF`. Staying within this range preserves ordinary near calls and jumps and avoids creating a new code segment.
 
+Later `EDIT-CPU-06` work exercised the smallest version of this strategy. Its
+124-byte helper consumes the 108-byte physical padding and appends 16 bytes at
+`CS:2B50..2B5F`; the generated file grows from `0x5800` to `0x5810`, while all
+existing offsets remain fixed. Static MZ, checksum, ownership, disassembly, and
+regression checks pass; a bounded expansion/CPU-play smoke test also passes,
+while controlled debugger validation remains pending.
+
 The implementation must verify:
 
 - the final appended offset remains representable in the current `CS`;

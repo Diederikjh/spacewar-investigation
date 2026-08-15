@@ -27,9 +27,11 @@ The original executable remains immutable. Detailed investigation findings remai
 | `EDIT-CPU-03` | Increase right pursuit thrust | Computer player | Proposed; Phase 5 rank 3 | Close distance more aggressively | Energy drain and overshoot | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-04` | Reduce right random escapes | Computer player | Proposed; Phase 5 rank 4 | Keep the pursuing player in combat more often | Hyperspace may currently provide useful defense | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-05` | Use shortest wrapped deltas | Computer player | Prototype; bounded ship-target behavior passed; extended validation pending | Correct edge-crossing aim and proximity errors | New code space and careful signed wrap arithmetic | [Prototype findings](edit-cpu-05-findings.md) |
-| `EDIT-CPU-06` | Add photon-oriented target leading | Computer player | Prototype; static validation passed; runtime pending | Improve right-player photon aim against moving targets while retaining current-position phaser and gravity behavior | Fixed-horizon tuning, pursuit side effects, raw edge geometry, and shared code-space ownership with `EDIT-CPU-05` | [Prototype findings](edit-cpu-06-findings.md) |
+| `EDIT-CPU-06` | Add gravity-aware photon-oriented target leading | Computer player | Expanded prototype; startup smoke passed; controlled validation pending | Improve right-player photon aim against moving targets under gravity-off and original-linear-gravity play | Fixed-horizon and gravity approximation, pursuit side effects, raw edge geometry, and shared code-space ownership with `EDIT-CPU-05` | [Prototype findings](edit-cpu-06-findings.md) |
 | `EDIT-CPU-07` | Improve left target selection | Computer player | Proposed; Phase 5 rank 7 | Avoid first-slot distractions and make defense more deliberate | Changes the left player's established defensive character | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-08` | Honour cloak while targeting | Computer player | Investigation pending; design captured | Prevent computer players from seeing a cloaked ship while retaining visible-projectile reactions | Separate left/right policy changes, random-call cadence, and code placement | [Deferred cloak-aware targeting](phase-5-findings.md#deferred-follow-up-cloak-aware-targeting) |
+| `EDIT-CPU-09` | Use trouble-aware hyperspace | Computer player/energy | Proposed; design pending | Spend eight weapon-energy units on hyperspace only for a concrete danger or resource crisis | Defining danger without making escape deterministic or exploitable | [Energy-efficiency proposals](#energy-efficiency-proposals) |
+| `EDIT-CPU-10` | Fire photons only at high-confidence intercepts | Computer player/energy | Proposed; design pending | Avoid photon energy and slot use when the predicted trajectory is unlikely to hit | Confidence estimation under wrapping, gravity, target actions, and quantized bearings | [Energy-efficiency proposals](#energy-efficiency-proposals) |
 
 ## `EDIT-GRAV-01`: more realistic gravity
 
@@ -148,8 +150,44 @@ Target leading cannot assume constant straight-line velocity when gravity is ena
 
 Both the target ship and the fired projectile receive gravity, so predicting only the ship's curved path would still produce an incorrect intercept. A first proof of concept should either be explicitly scoped to gravity-off play or advance target and projectile state through the same bounded fixed-point tick model used by the executable. Any later gravity edit must therefore trigger revalidation of `EDIT-CPU-06` trajectory and intercept tests.
 
-The first prototype takes the gravity-off route and is documented in
-[the EDIT-CPU-06 findings](edit-cpu-06-findings.md). It applies a 64-tick
-relative-velocity lead only to the right player at photon-like distances and
-falls back to current-position aim when gravity is enabled. The left policy is
+The expanded first prototype is documented in [the EDIT-CPU-06
+findings](edit-cpu-06-findings.md). It applies a 64-tick relative-velocity lead
+to the right player at photon-like distances. Under the original linear field,
+it adds the constant-initial-acceleration term `-delta/4`; this follows from the
+64-tick horizon and the field's exact relative acceleration
+`-delta/8192`. It is an approximation rather than a discrete simulation, and it
+does not model the softened `EDIT-GRAV-01` field. The left policy remains
 unchanged because it only fires the instantaneous phaser.
+
+## Energy-efficiency proposals
+
+### `EDIT-CPU-09`: trouble-aware hyperspace
+
+Both computer players currently request hyperspace from a masked random value,
+subject to the existing latch and eight-unit weapon-energy charge. A more
+energy-efficient policy should treat randomness as a tie-breaker after a danger
+test rather than as the reason to leave ordinary play.
+
+Candidate trouble signals include low shield energy, an opposing projectile or
+ship inside a bounded threat region, a closing trajectory, imminent planet
+contact, or insufficient weapon energy to continue the current policy. The
+design must define different left/right thresholds where their defensive and
+pursuit roles warrant it, preserve latch behavior, and avoid repeated
+hyperspace requests immediately after re-entry.
+
+### `EDIT-CPU-10`: confidence-gated photons
+
+The right computer player currently reaches photon fire through a small random
+gate whenever either raw axis is outside phaser range. A confidence gate should
+instead require a plausible bounded intercept before spending energy and
+occupying a projectile slot. Candidate inputs are predicted miss distance,
+intercept time within photon lifetime, bearing-quantization error, wrapped path,
+relative velocity, gravity-model validity, and whether the target is
+hyperspacing or cloaked.
+
+The first design should retain some randomness only after the confidence test,
+so identical situations do not always produce identical fire. Validation should
+compare photon attempts, energy spent per hit, slot occupancy, hit rate, round
+duration, and left/right win rate over identical bounded seeds. `EDIT-CPU-10`
+depends directly on the eventual `EDIT-CPU-05`/`EDIT-CPU-06` combined trajectory
+model rather than duplicating a third aiming calculation.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Apply the size-preserving EDIT-CPU-06 photon-leading patch."""
+"""Apply the expanded EDIT-CPU-06 gravity-aware photon-leading patch."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from spacewar_edit import (
     PADDING_SIZE,
     PatchError,
     PatchRegion,
-    apply_regions,
+    apply_image_extension,
     near_call,
     run_file_edit,
     sha256_hex,
@@ -25,6 +25,8 @@ from spacewar_edit import (
 LEAD_TICKS = 64
 PHASER_AXIS_LIMIT = 0x60
 GRAVITY_MASK = 0x02
+EXPANSION_SIZE = 0x10
+HELPER_SIZE = PADDING_SIZE + EXPANSION_SIZE
 
 
 def signed16(value: int) -> int:
@@ -63,11 +65,14 @@ def right_aim_deltas(
 
     current_x = signed16(current_x)
     current_y = signed16(current_y)
-    if gravity_enabled or (
+    if (
         abs(current_x) < PHASER_AXIS_LIMIT
         and abs(current_y) < PHASER_AXIS_LIMIT
     ):
         return current_x, current_y
+    if gravity_enabled:
+        current_x = signed16(current_x - (current_x >> 2))
+        current_y = signed16(current_y - (current_y >> 2))
     return (
         predicted_delta(current_x, target_velocity_x, shooter_velocity_x),
         predicted_delta(current_y, target_velocity_y, shooter_velocity_y),
@@ -99,7 +104,11 @@ def self_test_model() -> None:
         0,
     )
     assert right_aim_deltas(96, 0, one, 0, 0, 0, gravity_enabled=True) == (
-        96,
+        136,
+        0,
+    )
+    assert right_aim_deltas(-96, 0, -one, 0, 0, 0, gravity_enabled=True) == (
+        -136,
         0,
     )
 
@@ -108,23 +117,20 @@ def build_helper_code() -> tuple[bytes, dict[str, int]]:
     builder = CodeBuilder(PADDING_CS_OFFSET)
 
     # Begin with the original raw target-minus-shooter deltas. Leading is
-    # deliberately bypassed under gravity and while both axes are within the
-    # right policy's phaser range.
+    # deliberately bypassed while both axes are within the right policy's
+    # phaser range.
     builder.label("right_lead_deltas")
     builder.emit(0x8B, 0x0E, 0x1C, 0x0D)       # mov cx,[0d1c]
     builder.emit(0x2B, 0x0E, 0x2C, 0x0D)       # sub cx,[0d2c]
     builder.emit(0x8B, 0x16, 0x3C, 0x0D)       # mov dx,[0d3c]
     builder.emit(0x2B, 0x16, 0x4C, 0x0D)       # sub dx,[0d4c]
-    builder.emit(0xF6, 0x06, 0x40, 0x20, GRAVITY_MASK)
-    builder.branch8(0x75, "done")              # jnz done
-
     builder.emit(0x8B, 0xC1)                   # mov ax,cx
     builder.emit(0x0B, 0xC0)                   # or ax,ax
     builder.branch8(0x79, "x_absolute")        # jns x_absolute
     builder.emit(0xF7, 0xD8)                   # neg ax
     builder.label("x_absolute")
     builder.emit(0x3D, PHASER_AXIS_LIMIT, 0x00) # cmp ax,0060
-    builder.branch8(0x73, "lead")              # jae lead
+    builder.branch8(0x73, "predict")           # jae predict
 
     builder.emit(0x8B, 0xC2)                   # mov ax,dx
     builder.emit(0x0B, 0xC0)                   # or ax,ax
@@ -133,6 +139,22 @@ def build_helper_code() -> tuple[bytes, dict[str, int]]:
     builder.label("y_absolute")
     builder.emit(0x3D, PHASER_AXIS_LIMIT, 0x00) # cmp ax,0060
     builder.branch8(0x72, "done")              # jb done
+
+    # Under the original linear gravity field, relative acceleration is
+    # -(target_position - shooter_position) / 8192 pixels per tick squared.
+    # A constant-acceleration estimate over 64 ticks contributes -delta/4:
+    # 0.5 * (-delta/8192) * 64^2. Keep the gravity-off base unchanged.
+    builder.label("predict")
+    builder.emit(0xF6, 0x06, 0x40, 0x20, GRAVITY_MASK)
+    builder.branch8(0x74, "lead")              # jz lead
+    builder.emit(0x8B, 0xC1)                   # mov ax,cx
+    builder.emit(0xD1, 0xF8)                   # sar ax,1
+    builder.emit(0xD1, 0xF8)                   # sar ax,1
+    builder.emit(0x2B, 0xC8)                   # sub cx,ax
+    builder.emit(0x8B, 0xC2)                   # mov ax,dx
+    builder.emit(0xD1, 0xF8)                   # sar ax,1
+    builder.emit(0xD1, 0xF8)                   # sar ax,1
+    builder.emit(0x2B, 0xD0)                   # sub dx,ax
 
     # A photon moves at approximately two pixels per timer tick relative to
     # its firing ship. Use a tunable 64-tick horizon. For each axis, subtract
@@ -172,9 +194,9 @@ def build_helper_code() -> tuple[bytes, dict[str, int]]:
     code, addresses = builder.finish()
     if addresses.get("right_lead_deltas") != PADDING_CS_OFFSET:
         raise PatchError("unexpected EDIT-CPU-06 helper entry")
-    if len(code) != PADDING_SIZE:
+    if len(code) != HELPER_SIZE:
         raise PatchError(
-            f"expected {PADDING_SIZE} helper bytes, got {len(code)}"
+            f"expected {HELPER_SIZE} helper bytes, got {len(code)}"
         )
     return code, addresses
 
@@ -196,27 +218,20 @@ def patch_bytes(data: bytes) -> bytes:
             hook_expected,
             hook_replacement,
         ),
-        PatchRegion(
-            "MZ complete-final-page promotion",
-            0x02,
-            b"\x94\x01",
-            b"\x00\x00",
-        ),
-        PatchRegion(
-            "promoted target-leading helper",
-            PADDING_FILE_OFFSET,
-            b"\x00" * PADDING_SIZE,
-            helper_code,
-        ),
     )
-    return apply_regions(data, regions)
+    return apply_image_extension(
+        data,
+        regions,
+        helper_code,
+        tail_file_offset=PADDING_FILE_OFFSET,
+    )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Apply EDIT-CPU-06 to the exact investigated executable without "
-            "increasing its physical size."
+            "Apply the expanded EDIT-CPU-06 gravity-aware prototype to the "
+            "exact investigated executable."
         )
     )
     parser.add_argument("input_exe", type=Path)
@@ -239,10 +254,11 @@ def main() -> int:
     )
 
     print("EDIT-CPU-06 input validation: passed")
-    print("physical size preserved: 0x5800 bytes")
+    print("physical size expanded: 0x5800 -> 0x5810 bytes")
+    print("MZ size fields: pages 0x002D, final-page bytes 0x0010")
     print("lead horizon: 64 timer ticks")
-    print("gravity behavior: original current-position aim")
-    print("promoted helper range: CS:2AE4..2B4F (108 bytes)")
+    print("gravity behavior: original linear-field relative correction")
+    print("expanded helper range: CS:2AE4..2B5F (124 bytes)")
     print(f"patched SHA-256: {sha256_hex(patched)}")
     return 0
 

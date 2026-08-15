@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Shared, size-preserving edit tools for the investigated executable."""
+"""Shared executable-edit tools for the investigated executable."""
 
 from __future__ import annotations
 
@@ -194,6 +194,79 @@ def apply_regions(data: bytes, regions: Iterable[PatchRegion]) -> bytes:
     unexpected = changed - allowed
     if unexpected:
         raise AssertionError("edit changed bytes outside its ownership map")
+    return bytes(output)
+
+
+def apply_image_extension(
+    data: bytes,
+    regions: Iterable[PatchRegion],
+    image_tail: bytes,
+    *,
+    tail_file_offset: int = DECLARED_FILE_SIZE,
+) -> bytes:
+    """Replace the old physical padding and extend the loaded MZ image."""
+
+    validate_original(data)
+    if tail_file_offset != DECLARED_FILE_SIZE:
+        raise PatchError("image extension must begin at the old declared end")
+    old_tail_size = len(data) - tail_file_offset
+    if len(image_tail) <= old_tail_size:
+        raise PatchError("image extension must increase the physical file size")
+
+    new_size = tail_file_offset + len(image_tail)
+    same_segment_limit = CODE_FILE_BASE + 0x10000
+    if new_size > same_segment_limit:
+        raise PatchError("image extension would exceed the current code segment")
+
+    output = bytearray(data[:tail_file_offset])
+    output.extend(image_tail)
+    system_owned = {
+        *range(0x02, 0x06),
+        *range(CHECKSUM_OFFSET, CHECKSUM_OFFSET + 2),
+    }
+    allowed = set(system_owned)
+
+    for region in regions:
+        if len(region.replacement) != len(region.expected):
+            raise PatchError(f"non-size-preserving hook region: {region.name}")
+        if not 0 <= region.file_offset <= region.end <= tail_file_offset:
+            raise PatchError(f"hook is outside the old declared image: {region.name}")
+        owned = set(range(region.file_offset, region.end))
+        if allowed.intersection(owned):
+            raise PatchError(f"overlapping edit ownership: {region.name}")
+        if data[region.file_offset:region.end] != region.expected:
+            raise PatchError(f"unexpected original bytes at {region.name}")
+        output[region.file_offset:region.end] = region.replacement
+        allowed.update(owned)
+
+    pages = (new_size + 0x1FF) // 0x200
+    final_page_bytes = new_size & 0x1FF
+    if pages > 0xFFFF:
+        raise PatchError("expanded MZ page count does not fit the header")
+    struct.pack_into("<H", output, 0x02, final_page_bytes)
+    struct.pack_into("<H", output, 0x04, pages)
+
+    encoded_size = (pages - 1) * 0x200 + (final_page_bytes or 0x200)
+    if encoded_size != new_size:
+        raise AssertionError("expanded MZ size fields are inconsistent")
+
+    original_sum = word_sum(data)
+    struct.pack_into("<H", output, CHECKSUM_OFFSET, 0)
+    checksum = (original_sum - word_sum(output)) & 0xFFFF
+    struct.pack_into("<H", output, CHECKSUM_OFFSET, checksum)
+    if word_sum(output) != original_sum:
+        raise AssertionError("expanded MZ word-sum convention was not preserved")
+
+    changed_prefix = {
+        index
+        for index, (before, after) in enumerate(
+            zip(data[:tail_file_offset], output[:tail_file_offset])
+        )
+        if before != after
+    }
+    unexpected = changed_prefix - allowed
+    if unexpected:
+        raise AssertionError("extension changed bytes outside its ownership map")
     return bytes(output)
 
 
