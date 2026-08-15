@@ -230,11 +230,135 @@ Potential executable changes are centrally indexed in the [potential edits ledge
 
 A CPU-versus-CPU observation showed a brief visible duplicate or stale rendering
 of both ships while the computer players continued responding to the real ship
-state. Treat this as an unconfirmed rendering defect until it can be reproduced;
-the observation suggests visual state diverged from the live entity arrays
-rather than a second logical ship being created.
+state. A later human-versus-right-computer observation also affected both ships:
+the computer player entered hyperspace shortly after gameplay began, followed by
+the ghost rendering. This broadens the issue beyond CPU-versus-CPU play. Treat
+the hyperspace timing as a possible correlation, not yet a confirmed cause, and
+treat the overall anomaly as an unconfirmed rendering defect until it can be
+reproduced under controlled conditions. The observations suggest visual state
+diverged from the live entity arrays rather than a second logical ship being
+created.
 
-- [ ] Reproduce the blip under bounded CPU-versus-CPU runs and record the active options, transition, hyperspace, collision, and destruction state immediately before it appears.
+Both sightings were on edited executables: first on the earlier lead-only build,
+then on the expanded gravity-aware lead build. It is therefore possible that an
+edit introduced the anomaly, changed timing enough to expose an existing race,
+or merely made a pre-existing defect easier to notice. These descriptive build
+names are not sufficient evidence by themselves; each future run must record the
+exact input hash, generated-output hash, enabled game options, and patch set.
+The planet option was disabled in both observations, and the visible anomaly was
+not near the planet's location. Planet drawing and collision should therefore be
+deprioritized as direct causes, while planet-disabled controls remain part of the
+matched reproduction setup.
+
+#### Questions and competing explanations
+
+- Does the original executable exhibit the same anomaly under comparable modes and run lengths?
+- Does the lead-only build exhibit it more frequently than the original, and does the expanded gravity-aware build change that frequency again?
+- Is gravity relevant, or did hyperspace and gravity merely happen close together in one observation?
+- Is the visible object a stale ship XOR, a valid hyperspace particle pattern, a background interaction, an emulator presentation artefact, or a second legitimate draw at an adjacent snapshot?
+- Did an edit overwrite code or data, or did its extra foreground work alter the interrupt timing between erase, snapshot, and redraw operations?
+- Why are both ships affected after one right-side hyperspace event? Prioritize shared rendering state, the shared particle arrays, foreground/timer coordination, and whole-screen transitions over a right-player targeting-state explanation.
+
+#### Logging-first reproduction plan
+
+Use a staged approach so repeated attempts remain inexpensive and the
+instrumentation does not obscure the behavior it is intended to capture.
+
+1. Establish controls. Run the original executable, the exact lead-only output,
+   and the expanded gravity-aware output. Begin with human versus right computer
+   and CPU versus CPU, gravity off and on. Record only a compact run manifest:
+   hashes, patch set, option bits, play mode, initial five-byte random state,
+   elapsed ticks, hyperspace count by side, outcome, and whether an anomaly was
+   observed. Do not infer a patch regression until an original-build control has
+   received comparable exposure.
+2. Add event-level debugger logging. Capture game entry, left and right
+   hyperspace entry at `CS:06F6` and `CS:0759`, the corresponding completion
+   branch in the gameplay timer, ship entity activation changes, render-dirty
+   changes, render-state snapshots at `CS:022E`, ship XOR calls at `CS:1B96`, and
+   timer entry at `CS:233D`. A record should contain a monotonically increasing
+   sequence number, timer tick, foreground-iteration counter, side/stage, current
+   and previous X/Y, current and previous angle, entity state, dirty byte,
+   hyperspace counter, and interrupt-enabled state. Record state at routine
+   boundaries rather than tracing every instruction.
+3. Prefer a fixed-size circular binary buffer in an ignored diagnostic build if
+   the debugger cannot log those events without stopping. Freeze or dump the
+   buffer immediately after a visible anomaly; retaining only the most recent
+   few seconds avoids unbounded trace files. Compare an uninstrumented run, a
+   light event build, and the heavier diagnostic build so any timing-induced
+   observer effect is visible. Do not use the diagnostic build as evidence that
+   the original itself is defective.
+4. Parse locally. Convert raw records to a narrow event table, check sequence and
+   state invariants automatically, and emit a short anomaly window plus aggregate
+   run counts. Keep raw traces, diagnostic executables, memory dumps, and full
+   screenshots ignored. If unattended visual confirmation is needed, retain only
+   a short rolling local capture and preserve the window around a suspected
+   event. Give the model the compact parsed event window; use the established
+   original-resolution crops only when a visual distinction cannot be expressed
+   in the event data.
+5. Once a suspicious transition is found, replace the broad event logger with a
+   bounded debugger experiment around that one transition. Use instruction logs
+   only for the small interval required to decide whether an erase, snapshot,
+   draw, or hyperspace state change was missing or reordered.
+
+#### State-capture mechanics
+
+Use two capture levels so the original and edited executables can first be
+observed without diagnostic code changing their timing:
+
+1. For an uninstrumented run, enter the host debugger immediately when the ghost
+   appears. This freezes guest execution without first sending a gameplay key.
+   Record registers and use the debugger's binary memory-dump command to save the
+   live data segment, the 16 KiB CGA framebuffer at `B800:0000`, and any smaller
+   relevant ranges. This is a post-event snapshot: it can distinguish logical
+   ship state from framebuffer state, but it cannot reconstruct the preceding
+   event order.
+2. For an ignored diagnostic build, hooks at the selected boundaries write
+   fixed-width records into a circular buffer reserved in a proven non-overlapping
+   extension. The hooks do not call DOS or write files from the timer interrupt.
+   When an anomaly is seen, enter the debugger, dump that buffer with
+   `MEMDUMPBIN`, then dump the live data and framebuffer. If an automatic
+   invariant trips first, freeze the buffer while leaving enough state to identify
+   the trigger.
+3. Move and name each raw dump by a run identifier before issuing the next dump,
+   because the debugger uses a fixed output filename. Keep these files ignored.
+   A local parser combines the build manifest, register state, circular records,
+   state arrays, and framebuffer into a concise anomaly report.
+
+The live-state snapshot should include both ships' current and previous-rendered
+coordinates and angles, fixed-point velocities, dirty and entity bytes, action
+and latch flags, energy, hyperspace counters, shared tick and option bytes, the
+five-byte random state, and the shared hyperspace particle arrays. A full data-
+segment dump is inexpensive locally and protects against omitting an unknown
+field; only named fields and changed ranges should be included in the report sent
+for analysis. The framebuffer dump permits a local tool to test whether ship
+sprite masks exist at the recorded current or previous positions and whether an
+extra XOR image remains elsewhere.
+
+The pilot should measure exposure in completed hyperspace events, not just runs.
+First match the two observed situations against an original-build control and
+collect ten right-side hyperspace completions per build/configuration cell, or a
+fixed local time limit if ten do not occur. If no anomaly appears, automate a
+larger batch and report only totals per cell. Expand the gravity and play-mode
+matrix only after those matched pairs, so the first pass does not spend time on
+low-value combinations.
+
+The first automatic invariants should flag an active dirty ship whose previous
+snapshot is not erased before replacement, a ship XOR call while its entity is
+inactive outside the documented hyperspace transition, snapshot changes without
+a corresponding dirty transition outside initialization, hyperspace completion
+without synchronized current/previous coordinates, and an unmatched erase/draw
+parity for either ship. Capturing the random state at game entry helps classify
+and potentially replay a promising run, but it is not sufficient by itself:
+foreground timing and the complete intervening random-call order also matter.
+
+#### Execution checklist
+
+- [ ] Recover or regenerate each observed edited build from its patcher and record its exact hash; do not rely on a descriptive filename.
+- [ ] Build a local batch runner and compact run-manifest format, with all raw outputs kept under ignored paths.
+- [ ] Define the fixed-width event schema and local decoder before instrumenting an executable, including explicit segment/range ownership for the circular buffer.
+- [ ] Rehearse debugger register, data-segment, circular-buffer, and CGA framebuffer dumps on an ordinary non-anomalous run so a rare sighting is not lost to an untested capture step.
+- [ ] Complete a small pilot across the original, lead-only, and expanded gravity-aware builds before choosing a larger run count.
+- [ ] Reproduce the blip under bounded CPU-versus-CPU and human-versus-right-computer runs, including immediate-start hyperspace cases, and record the active options, transition, hyperspace, collision, and destruction state immediately before it appears.
 - [ ] Distinguish a stale ship sprite from a background pixel cluster, particle effect, emulator presentation artefact, or an XOR erase/redraw at two valid adjacent positions.
 - [ ] Correlate current position, previous-rendered position, current/previous angle, dirty state, cloak, entity state, and hyperspace counter for both ship slots.
 - [ ] Investigate whether a gameplay timer interrupt between foreground erase, snapshot, and redraw steps can leave an unmatched XOR sprite despite the existing short `CLI` snapshot section.
@@ -347,5 +471,5 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 ### 2026-08-15
 
 - Implemented an expanded `EDIT-CPU-06` photon-leading prototype for the right computer player. It uses exact signed 16.16 target-minus-shooter velocity over a 64-tick horizon and a constant-relative-acceleration correction for the original linear gravity field. The helper uses the 108-byte padding plus a guarded 16-byte same-segment append; static validation and a bounded gravity-enabled CPU-play smoke test pass while controlled calculation and tuning checks remain open.
-- Added a post-design investigation for the observed intermittent ghost-ship rendering blip, focusing on XOR erase/snapshot/redraw state and timer/foreground interaction.
+- Expanded the intermittent ghost-ship investigation after sightings on both the earlier lead-only build and the gravity-aware lead build. Both sightings had the planet disabled and occurred away from its location. The logging-first plan compares exact edited hashes against original controls, measures matched hyperspace exposure, captures live data and CGA memory, retains compact circular event history, and uses locally parsed anomaly windows to test XOR, hyperspace, and foreground/timer hypotheses efficiently.
 - Added `EDIT-CPU-09` trouble-aware hyperspace and `EDIT-CPU-10` confidence-gated photons as energy-efficiency proposals.
