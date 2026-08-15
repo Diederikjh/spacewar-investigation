@@ -71,6 +71,17 @@ Use local screenshot crops instead of OCR when the debugger terminal is being dr
 4. For breakpoints, run `BPLIST` and inspect a crop containing the exact registered address before pressing F5.
 5. When execution stops, crop the `CS:EIP` registers, relevant code rows, and required data bytes separately. Use a larger crop or the full debugger window only when a narrow crop is ambiguous.
 
+Every indirect X11 input should normally flow through
+`analysis/scripts/ghost-capture-session.py`. It launches a uniquely identified
+session, discovers the DOSBox window through the launched process identity, and
+revalidates both stored window identities before each action. It then invokes
+`analysis/scripts/x11-input.py`, which raises and activates the exact target,
+verifies input focus, and emits at most the requested action. Text and Return
+remain separate focus-verified actions so the pre-Enter crop is still a hard
+gate. Before asking a human to press a guest key, use the session driver's
+`focus dosbox` action immediately before handing over. Direct title-only window
+selection is not acceptable.
+
 Do not resume execution when any checkpoint is missing. Store screenshots and crops only as temporary local files, remove them after validation, and do not add them to the repository.
 
 When commands are driven indirectly, prefer individual key events over a batch of typed text. In P3-09, pre-Enter crops caught two incomplete commands (`B` instead of `BPINT 3`, and `d 00` instead of `d 0000:0020`). Both were corrected before Enter; the complete breakpoint set was then confirmed with `BPLIST`.

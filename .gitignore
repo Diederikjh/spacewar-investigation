@@ -15,5 +15,7 @@
 __pycache__/
 *.py[cod]
 LOGCPU.TXT
+/MEMDUMP.BIN
+/MEMDUMP.TXT
 *.log
 .DS_Store

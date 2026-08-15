@@ -294,6 +294,19 @@ sprite if completion sees the visibility bit still set, and a separate round-end
 particle-array race. The next gate is a narrow visibility-bit lifecycle check,
 not broad state capture.
 
+The exact uninstrumented snapshot and archival procedure is recorded in the
+[ghost-rendering capture runbook](ghost-rendering-capture-runbook.md). The
+ordinary non-anomalous rehearsal passed: both bounded dump sizes and the active
+CPU-versus-CPU, gravity-on, planet-off option bytes were confirmed. It also
+exposed and now documents a critical entry-break safeguard: a breakpoint stop
+may not raise its window, so `CS:EIP` and the injected bytes must be checked
+before every resume. Repository-local X11 input tooling now raises and activates
+an exact transient window ID, verifies focus, and only then sends input; manual
+handoffs likewise require an explicit foreground step. A managed session driver
+now launches with a unique title, associates DOSBox with the exact launched
+process, retains transient identifiers only in ignored state, and revalidates
+both identities before every runbook action.
+
 #### Logging-first reproduction plan
 
 After the focused audit, use a staged approach so repeated attempts remain
@@ -394,7 +407,7 @@ foreground timing and the complete intervening random-call order also matter.
 - [ ] Build a local batch runner and compact run-manifest format, with all raw outputs kept under ignored paths.
 - [ ] Separate the informal early-hyperspace observation into exact per-build numerators and denominators before treating the estimated 30% as an incidence rate.
 - [ ] Define the fixed-width event schema and local decoder before instrumenting an executable, including explicit segment/range ownership for the circular buffer.
-- [ ] Rehearse debugger register, data-segment, circular-buffer, and CGA framebuffer dumps on an ordinary non-anomalous run so a rare sighting is not lost to an untested capture step.
+- [x] Rehearse debugger register, data-segment, and CGA framebuffer dumps on an ordinary non-anomalous run so a rare sighting is not lost to an untested capture step. Circular-buffer capture remains conditional on snapshot results. See [the capture runbook](ghost-rendering-capture-runbook.md).
 - [ ] Complete a small pilot across the original, lead-only, and expanded gravity-aware builds before choosing a larger run count.
 - [ ] Reproduce the blip under bounded CPU-versus-CPU and human-versus-right-computer runs, including immediate-start hyperspace cases, and record the active options, transition, hyperspace, collision, and destruction state immediately before it appears.
 - [ ] Distinguish a stale ship sprite from a background pixel cluster, particle effect, emulator presentation artefact, or an XOR erase/redraw at two valid adjacent positions.
@@ -512,4 +525,9 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Expanded the intermittent ghost-ship investigation after sightings on both the earlier lead-only build and the gravity-aware lead build. Both sightings had the planet disabled and occurred away from its location. A focused hyperspace/dirty-redraw static audit now gates runtime instrumentation; any remaining work compares exact edited hashes against original controls, measures matched hyperspace exposure, captures live data and CGA memory, retains compact circular event history, and uses locally parsed anomaly windows efficiently.
 - Completed the focused static gate. It found a definite one-foreground-pass deferred erase at hyperspace entry, a conditional stranded-sprite sequence if completion finds the ordinary visibility bit set, and an independently real round-end/hyperspace particle-array race. It found no direct rendering-state write or code overlap in either lead patch and reduced the next runtime work to a small visibility-bit lifecycle check.
 - Added an informal runtime clue from approximately five CPU-versus-CPU comparison runs: roughly 30% of launches involving early hyperspace appeared to show the ghost effect. The sample is not yet split into exact build-specific event counts, so it raises the priority of the entry transition without establishing a defect rate or patch cause.
+- Rehearsed the uninstrumented state-capture workflow on an ordinary original-based CPU-versus-CPU run. The data and CGA dumps matched their exact expected sizes, and captured option bytes confirmed gravity enabled with the planet disabled. The disposable dumps were removed after validation. The runbook now makes the entry-stop window behavior and one-F5 ordering explicit after an initial attempt demonstrated that an unseen breakpoint stop can otherwise be resumed prematurely.
+- Added fail-closed X11 input handling for future debugger runs. Each automated action now targets an exact transient window ID, activates and raises it, verifies input focus, and only then emits input. Text and Enter are separate focus-verified actions, and manual handoffs require an immediate foreground-only action first.
+- Added a managed ghost-capture session driver. It launches a uniquely titled debugger, discovers DOSBox from the exact launched process, keeps process and window identifiers in ignored state, rejects ambiguous or recycled targets, exposes guarded runbook-specific commands, and closes only the validated disposable session.
+- Tightened dump archival so the `data` and `cga` labels enforce their exact expected sizes before the fixed debugger output is moved.
+- Made any focus or input failure a hard runbook pause. Automated retries and fallback global input are prohibited; the user must be notified, focus must be explicitly restored and verified, and any partial debugger text must be inspected before the failed action can be retried.
 - Added `EDIT-CPU-09` trouble-aware hyperspace and `EDIT-CPU-10` confidence-gated photons as energy-efficiency proposals.
