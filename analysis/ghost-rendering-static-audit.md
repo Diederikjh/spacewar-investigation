@@ -362,6 +362,16 @@ the render coordinates.
 This reproduction closes the remaining attribution question: the lifecycle
 defect exists in the original executable and does not require a prototype edit.
 
+## Prototype repair
+
+`EDIT-HYPER-02` implements the selected minimal repair by clearing both
+hyperspace counters at round start before the original initializer draws either
+ship. Its first controlled runtime run passed the left and right versions of
+the reproduction above, directly observed both counter bytes as zero before
+initialization, and completed one normal same-round hyperspace cycle per side.
+Implementation, placement, validation limits, and reproduction details are in
+[the focused edit findings](edit-hyper-02-findings.md).
+
 ## Completion-check history
 
 Eight left completion stops at `CS:2630` were collected across two launches of

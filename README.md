@@ -6,9 +6,9 @@ major subsystems cooperate, and which carefully scoped gameplay edits appear
 feasible.
 
 All six planned investigation phases are complete. The current milestone is a
-high-confidence architecture reconstruction plus two size-preserving executable
-edit prototypes. The original executable remains immutable and is deliberately
-excluded from version control.
+high-confidence architecture reconstruction plus several carefully scoped
+executable-edit prototypes. The original executable remains immutable and is
+deliberately excluded from version control.
 
 ## Overall design findings
 
@@ -60,6 +60,7 @@ that further validation may still be required.
 | `EDIT-CPU-06` | Lead the right player's photon-oriented aim using relative velocity and an original-linear-gravity correction. | Expanded standalone prototype; the guarded 16-byte append, static validation, and a bounded CPU-play smoke test passed. Controlled calculation, tuning, wrapping, and softened-gravity validation remain. | [Gravity-aware photon-leading findings](analysis/edit-cpu-06-findings.md) |
 | `EDIT-GRAV-01` | Replace the original spring-like gravity with a softened field that weakens at long range. | Size-preserving prototype; static checks, exact positive/negative debugger calculations, and bounded CPU-versus-CPU runtime passed. Worst-case timing and extended trajectory validation remain. | [Softened-gravity findings](analysis/edit-grav-01-findings.md) |
 | `EDIT-HYPER-01` | Preserve each ship's signed 16.16 velocity across hyperspace instead of restoring it at rest. | Proposed; behavior, storage questions, interactions, and validation criteria are captured, but no executable edit has been made. | [Hyperspace proposal](analysis/potential-edits.md#edit-hyper-01-preserve-ship-velocity-through-hyperspace) |
+| `EDIT-HYPER-02` | Clear inherited hyperspace counters before a new round draws its ships. | Size-preserving prototype; guarded generation, static checks, debugger state proof, and left/right F1/F2 visual regressions passed. Extended timing and option-matrix validation remains. | [Round-start reset findings](analysis/edit-hyper-02-findings.md) |
 
 The [potential edits ledger](analysis/potential-edits.md) is the central index for
 these edits and the remaining computer-player difficulty proposals. Shared MZ

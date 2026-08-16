@@ -22,7 +22,7 @@ The original executable remains immutable. Detailed investigation findings remai
 |---|---|---|---|---|---|---|
 | `EDIT-GRAV-01` | More realistic gravity | Physics | Prototype; bounded runtime passed; extended validation pending | Replace the current spring-like field with a force that becomes stronger near the planet and weaker at long distance | Per-tick division cost, near-center behavior, and changed game balance | [Prototype findings](edit-grav-01-findings.md) |
 | `EDIT-HYPER-01` | Preserve ship velocity through hyperspace | Physics/gameplay | Proposed; design captured | Retain a ship's incoming momentum when it reappears instead of forcing it to rest | Saved-state placement, immediate post-arrival hazards, and interaction with gravity during absence | [Hyperspace particle cycle](phase-6-findings.md#hyperspace-particle-cycle) |
-| `EDIT-HYPER-02` | Reset hyperspace counters at round start | Rendering/lifecycle | Proposed; behavior selected | Prevent an old effect from resuming against newly active ships and stranding XOR sprites | Inserting the reset before initial drawing without disturbing ordinary hyperspace | [Confirmed cause](ghost-rendering-static-audit.md#instrumented-reproduction-and-confirmed-cause) |
+| `EDIT-HYPER-02` | Reset hyperspace counters at round start | Rendering/lifecycle | Prototype; static and first controlled runtime validation passed | Prevent an old effect from resuming against newly active ships and stranding XOR sprites | Broader timing, option, and repeated-trace validation remains | [Prototype findings](edit-hyper-02-findings.md) |
 | `EDIT-CPU-01` | Increase right weapon attempts | Computer player | Proposed; Phase 5 rank 1 | More frequent offensive weapon decisions through a one-byte threshold change | Faster energy use and more projectile activity | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-02` | Widen left proximity defense | Computer player | Proposed; Phase 5 rank 2 | Let the defensive player engage ships and projectiles from farther away | More distant low-priority phaser use | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-03` | Increase right pursuit thrust | Computer player | Proposed; Phase 5 rank 3 | Close distance more aggressively | Energy drain and overshoot | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
@@ -170,6 +170,18 @@ This deliberately fixes the confirmed new-round corruption without changing
 F1/frontend presentation or the ordinary same-round hyperspace cycle. Cancelling
 effects earlier at frontend or round-end entry remains a separate hardening
 option because it has additional visible-particle and shared-array semantics.
+
+The first prototype uses a guarded round-start call and an internal nine-byte
+helper. Its exact placement, ownership, and static checks are recorded in
+[the prototype findings](edit-hyper-02-findings.md).
+
+The first controlled runtime regression also passed. After both a left-side and
+a right-side active-hyperspace F1/F2 transition, the replacement round had no
+inherited particles or default-position ghost. A debugger stop immediately
+after the helper proved `DS:0060/0061 = 00/00` before the original initializer,
+and one normal same-round hyperspace cycle per side still completed. The wider
+option, timing, simultaneous-effect, and repeated-trace checks below remain
+open.
 
 ### Validation criteria
 
