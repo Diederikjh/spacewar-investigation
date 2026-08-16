@@ -92,6 +92,12 @@ def parser() -> argparse.ArgumentParser:
     hotkey_parser.add_argument("modifier")
     hotkey_parser.add_argument("key")
 
+    keys_parser = subparsers.add_parser(
+        "keys",
+        help="send a sequence of named X11 keys with focus checks between them",
+    )
+    keys_parser.add_argument("keys", nargs="+")
+
     text_parser = subparsers.add_parser(
         "text", help="type ASCII text without pressing Return"
     )
@@ -261,6 +267,9 @@ class X11Input:
         self.sync_checked(f"cannot focus X11 window 0x{target:x}")
         time.sleep(0.1)
 
+        self.verify_focus(target)
+
+    def verify_focus(self, target: int) -> None:
         focused = ctypes.c_ulong()
         revert = ctypes.c_int()
         self.x11.XGetInputFocus(
@@ -285,13 +294,35 @@ class X11Input:
         self.x11.XFlush(self.display)
         time.sleep(0.025)
 
-    def tap(self, name: str, shifted: bool = False) -> None:
+    def tap(
+        self,
+        name: str,
+        shifted: bool = False,
+        *,
+        extra_hold_seconds: float = 0.0,
+    ) -> None:
         if shifted:
             self.emit("Shift_L", True)
         self.emit(name, True)
+        if extra_hold_seconds:
+            time.sleep(extra_hold_seconds)
         self.emit(name, False)
         if shifted:
             self.emit("Shift_L", False)
+
+    def tap_sequence(self, target: int, names: list[str]) -> None:
+        for index, name in enumerate(names):
+            try:
+                self.verify_focus(target)
+            except RuntimeError as error:
+                raise RuntimeError(
+                    f"focus lost before sequence key {index + 1} ({name})"
+                ) from error
+            # Frontend options are edge-latched toggles. Hold each requested key
+            # long enough to survive a busy guest timer, but emit it only once.
+            self.tap(name, extra_hold_seconds=0.075)
+            if index + 1 < len(names):
+                time.sleep(0.15)
 
     def type_text(self, value: str) -> None:
         special = {
@@ -329,6 +360,8 @@ def main() -> int:
                 xinput.tap(arguments.key)
             finally:
                 xinput.emit(arguments.modifier, False)
+        elif arguments.action == "keys":
+            xinput.tap_sequence(arguments.window_id, arguments.keys)
         elif arguments.action == "text":
             xinput.type_text(arguments.text)
         print(f"focused 0x{arguments.window_id:x}; action {arguments.action} completed")

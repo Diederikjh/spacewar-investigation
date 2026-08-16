@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if (( $# != 2 )); then
-    printf 'usage: %s RUN_ID {data|cga}\n' "$0" >&2
+    printf 'usage: %s RUN_ID {data|cga|trace}\n' "$0" >&2
     exit 2
 fi
 
@@ -22,8 +22,11 @@ case $label in
     cga)
         expected_size=$((0x4000))
         ;;
+    trace)
+        expected_size=$((0xc010))
+        ;;
     *)
-        printf 'error: LABEL must be data or cga\n' >&2
+        printf 'error: LABEL must be data, cga, or trace\n' >&2
         exit 2
         ;;
 esac

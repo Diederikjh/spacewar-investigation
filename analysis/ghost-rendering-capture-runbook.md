@@ -2,10 +2,11 @@
 
 ## Purpose
 
-Capture one useful post-event state without changing gameplay timing through
-continuous breakpoints or a diagnostic executable. This is the first runtime
-step after the focused static audit. Circular event logging remains a fallback
-if a snapshot cannot distinguish the candidates.
+Capture post-event state while controlling how much the observation changes
+gameplay timing. The first uninstrumented snapshot proved that the visible
+anomaly is a set of stale XOR ship images. A later full-speed diagnostic run
+captured the causal event sequence: hyperspace counters survive a round
+transition even though the framebuffer and copied round state are reset.
 
 Raw executable copies, state dumps, framebuffer dumps, screenshots, and run
 manifests belong under ignored paths. Do not commit them.
@@ -151,10 +152,30 @@ Rehearse on an ordinary run before waiting for the anomaly:
    If `CS:EIP` is not the expected executable entry, stop and restart the
    disposable run. Continuing from an unverified entry can execute the injected
    bytes and produce a stream of illegal-instruction messages.
-3. Select CPU-versus-CPU, keep the planet disabled, set the intended gravity
-   option, and start play. The original-based, gravity-on sequence is four
-   separate `analysis/scripts/ghost-capture-session.py` commands:
-   `guest-key F3`, `guest-key F4`, `guest-key F6`, then `guest-key F2`.
+3. On a fresh frontend with its default options, select CPU-versus-CPU, leave
+   the planet disabled, and enable gravity in one focus-verified sequence:
+
+   ```bash
+   analysis/scripts/ghost-capture-session.py guest-option-sequence
+   ```
+
+   The helper raises and focuses the exact DOSBox window, verifies focus before
+   every key, holds each of F3, F4, and F6 longer than an ordinary tap, and
+   releases each key before sending the next. Capture the exact game window once:
+
+   ```bash
+   analysis/scripts/ghost-capture-session.py capture-options
+   ```
+
+   Inspect that ignored local image and verify the whole option row: both
+   computer-player options on, planet off, gravity on. Only after that single
+   checkpoint, start play separately with
+   `analysis/scripts/ghost-capture-session.py guest-key F2`.
+
+   These option keys toggle state. The sequence is valid only from a confirmed
+   fresh default frontend. If it fails partway, stop, inspect the option row,
+   and do not rerun the whole sequence blindly; otherwise already-applied
+   toggles would be reversed.
 4. At an arbitrary non-anomalous moment, run
    `analysis/scripts/ghost-capture-session.py open-debugger`. Do not first press
    the game's pause key because that changes guest state before capture.
@@ -296,7 +317,167 @@ One stale image is adjacent to the template's `(160,46)` left start position.
 Several preceding CPU-versus-CPU matches ended naturally, and the operator
 relaunched play until the anomaly appeared during a later live match. It was not
 observed at round end. Both frontend and game entry clear the complete CGA
-framebuffer before drawing their new screen, so those completed matches cannot
-have carried the images into the captured match. The next bounded checks should
-prioritize an early left hyperspace entry/completion within one match; the right
-hyperspace visible at capture may be concurrent rather than causal.
+framebuffer before drawing their new screen, so old pixels cannot cross that
+boundary. The later circular trace nevertheless proved that the logical
+hyperspace counters can cross it and recreate stale sprites in the fresh
+framebuffer.
+
+## Completion-breakpoint result
+
+Eight left hyperspace completions were inspected across two launches of the
+exact gravity-only build. All eight reached `CS:2630` with left visibility,
+dirty, and entity state zero, and none showed a visible ghost. The samples do
+not disprove the conditional completion candidate, but repeating the same
+stopped experiment has diminishing value and may perturb the foreground/timer
+ordering under investigation.
+
+The second launch was deliberately ended by removing the completion breakpoint,
+resuming, and sending F1. The DOSBox process exited before the expected frontend
+confirmation. The synthetic key helper holds a key for 25 ms, which is long
+enough for a plausible live-game-to-frontend transition followed by a second
+frontend observation of the same F1 state. Treat this as a tooling hazard rather
+than game evidence: do not use F1 to recycle full-speed diagnostic matches.
+Allow CPU-versus-CPU rounds to end naturally, press F2 from the frontend, or
+close the validated disposable session and launch a fresh one.
+
+## Full-speed circular trace
+
+### Build identity and scope
+
+The first diagnostic image is derived only from
+`analysis/work/SPACEGRAV.EXE`, SHA-256
+`a8be13c10e4440615692b1a4dd580a9569cfc8a6178f7f9f434c0b0ea8bc8d50`.
+That input contains `EDIT-GRAV-01` but does not compose either computer-player
+edit. Generate the ignored diagnostic copy from the repository root:
+
+```bash
+analysis/scripts/instrument-ghost-trace.py \
+    analysis/work/SPACEGRAV.EXE \
+    analysis/work/SPACEGTR.EXE
+```
+
+The generator requires the exact input hash and guarded original bytes at every
+hook. It expands a disposable copy while preserving all existing offsets, the
+gravity routine, and the executable's word-sum convention. The ordinary gravity
+build remains unchanged. The current generator output has SHA-256
+`d690f339930eb80113c5531d7a90d57d7b07fa80eccf5ba4185d131097aa5089`.
+
+The diagnostic image records five event types for both ships:
+
+1. hyperspace entry after its counter becomes active;
+2. one record before each timer-owned particle movement pass;
+3. hyperspace completion before it erases particles or replaces ship state;
+4. every actual ordinary ship XOR, before the visibility bit toggles; and
+5. every completed ship render snapshot, after current state has replaced the
+   previous-rendered state and dirty has been cleared.
+
+The code occupies `CS:2AE4..2C71`. A 16-byte header begins at `CS:2E00`,
+followed by 2,048 24-byte records at `CS:2E10..EE0F`. Each committed record
+contains a sequence number, event, side, shared tick, both hyperspace counters,
+visibility, dirty and entity state, current and previous angles, action and
+latch bytes, entry flags, and current/previous X/Y coordinates for that ship.
+The complete bounded dump is `0xC010` bytes.
+
+No hook calls DOS, writes a file, or prints while gameplay runs. Record
+reservation briefly masks interrupts; filling the reserved record restores the
+caller's interrupt state and commits the event byte last. A nested timer event
+therefore receives a different slot, and a partially filled final record can be
+discarded safely. This is still an instrumented build: compare its reproduction
+behavior with uninstrumented observations and use it to recover event order,
+not by itself to attribute the defect to the original executable.
+
+### Full-speed run and anomaly capture
+
+1. Launch a fresh managed session with the diagnostic source and follow the
+   existing one-time entry restoration procedure:
+
+   ```bash
+   analysis/scripts/ghost-capture-session.py launch \
+       --source analysis/work/SPACEGTR.EXE
+   ```
+
+2. At a confirmed fresh frontend, run `guest-option-sequence`, then
+   `capture-options` once to verify that F3/F4 are on, F5 is off, and F6 is on.
+   Start play with a separate `guest-key F2`. Do not set lifecycle breakpoints.
+   A partial option-sequence failure is a hard stop because repeating toggles
+   blindly can invert the options that already succeeded.
+3. Let the match run at full speed. Count completed matches and observed early
+   hyperspace entries separately. Use natural round endings and F2 relaunches;
+   do not use F1 to return from live play.
+4. When a ghost is visible, immediately run `open-debugger`. Do not press a
+   guest pause key first. Confirm that execution stopped and read the active
+   runtime `CS` and `DS` values.
+5. Type, visually verify, submit, and archive the trace before another dump:
+
+   ```bash
+   analysis/scripts/ghost-capture-session.py type-trace-dump RUNTIME_CS
+   analysis/scripts/ghost-capture-session.py submit-debugger
+   analysis/scripts/archive-debug-dump.sh RUN_ID trace
+   ```
+
+6. Capture and archive the ordinary data and CGA dumps using the established
+   procedure. The run is useful only if all three files share the same run ID
+   and execution was not resumed between them.
+7. Decode the trace locally. The default report includes aggregate event and
+   invariant counts plus only the latest 64 committed records:
+
+   ```bash
+   analysis/scripts/decode-ghost-trace.py RUN_ID --write
+   analysis/scripts/decode-ghost-capture.py RUN_ID --write
+   ```
+
+8. Stop the disposable run after capture. Keep the diagnostic executable, raw
+   trace, memory dumps, framebuffer dump, screenshots, and decoded full reports
+   under ignored paths.
+
+For a clean run, retain only compact counts: exact build hash, matches,
+hyperspace entries and completions per side, whether the buffer wrapped, and
+whether any invariant warning occurred. Do not retain screenshots or empty raw
+capture directories.
+
+### Instrumented reproduction result
+
+The third full-speed CPU-versus-CPU round produced a visible anomaly within
+approximately the first second. The operator identified the affected player as
+left. The archived framebuffer confirms that the two extra shapes are perfect
+left-player frame-zero masks at `(164,46)` and `(59,131)`. The ordinary right
+sprite at `(226,137)` is the legitimate active right ship.
+
+The circular trace recovered the minimal sequence without resuming execution:
+
+1. The preceding round ended while hyperspace was active. During its final
+   gameplay-timer interval the counters reached left `44` and right `8`.
+2. The next game entry cleared the framebuffer and copied the new round
+   template, but did not clear `DS:0060/0061`. Its initial left and right ship
+   draws therefore occurred while those stale counters were still nonzero.
+3. The timer resumed the old left effect over the new round. At trace sequence
+   8293, left completion saw the new left ship active and visible at `(164,46)`
+   rather than absent with visibility zero.
+4. Completion replaced the live ship coordinates with the old particle result
+   `(59,131)`. Subsequent XOR and snapshot events stranded frame-zero images at
+   both coordinates.
+5. A later right hyperspace request also started from a stale nonzero counter,
+   confirming the same lifecycle failure independently on that side.
+
+The trace contained 2,048 committed records with no incomplete records or
+sequence gaps. Its invariant summary reported 65 timer movements while a ship
+was active, one active-entity/visibility failure at completion, one later entry
+from an already nonzero counter, and three initial ship draws with nonzero
+hyperspace counters. The finding explains why the anomaly clusters around early
+hyperspace after relaunches: framebuffer pixels do not survive the transition,
+but effect counters do, and the resumed effect corrupts the fresh round's XOR
+render state.
+
+### Original-executable reproduction result
+
+The unmodified original was later reproduced repeatedly in human-versus-human
+mode by starting hyperspace, pressing F1 before completion, and starting a new
+round with F2. The old animation remained frozen while the frontend was open,
+resumed only after gameplay restarted, and then stranded a ghost at the
+affected ship's default start position. Different frontend wait times did not
+advance the effect. The final live position sometimes resembled the previous
+hyperspace destination but varied and was not the exact selected coordinate.
+
+This is now the smallest manual regression case. A counter-reset prototype
+should run it for left and right ships, immediate and delayed F2 restarts, and
+require no inherited particle movement or default-position ghost.

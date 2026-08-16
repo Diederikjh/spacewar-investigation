@@ -22,6 +22,7 @@ The original executable remains immutable. Detailed investigation findings remai
 |---|---|---|---|---|---|---|
 | `EDIT-GRAV-01` | More realistic gravity | Physics | Prototype; bounded runtime passed; extended validation pending | Replace the current spring-like field with a force that becomes stronger near the planet and weaker at long distance | Per-tick division cost, near-center behavior, and changed game balance | [Prototype findings](edit-grav-01-findings.md) |
 | `EDIT-HYPER-01` | Preserve ship velocity through hyperspace | Physics/gameplay | Proposed; design captured | Retain a ship's incoming momentum when it reappears instead of forcing it to rest | Saved-state placement, immediate post-arrival hazards, and interaction with gravity during absence | [Hyperspace particle cycle](phase-6-findings.md#hyperspace-particle-cycle) |
+| `EDIT-HYPER-02` | Reset hyperspace counters at round start | Rendering/lifecycle | Proposed; behavior selected | Prevent an old effect from resuming against newly active ships and stranding XOR sprites | Inserting the reset before initial drawing without disturbing ordinary hyperspace | [Confirmed cause](ghost-rendering-static-audit.md#instrumented-reproduction-and-confirmed-cause) |
 | `EDIT-CPU-01` | Increase right weapon attempts | Computer player | Proposed; Phase 5 rank 1 | More frequent offensive weapon decisions through a one-byte threshold change | Faster energy use and more projectile activity | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-02` | Widen left proximity defense | Computer player | Proposed; Phase 5 rank 2 | Let the defensive player engage ships and projectiles from farther away | More distant low-priority phaser use | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
 | `EDIT-CPU-03` | Increase right pursuit thrust | Computer player | Proposed; Phase 5 rank 3 | Close distance more aggressively | Energy drain and overshoot | [Difficulty modifications](phase-5-findings.md#difficulty-modifications) |
@@ -137,6 +138,55 @@ Preservation means exact signed 16.16 momentum at entry. The first design should
 6. Verify computer-player hyperspace uses the same preserved-momentum path without changing its probability, energy, or latch policy.
 7. Trigger a round end while one ship is absent and confirm that temporary saved-state reuse cannot leak into the frontend or a later round.
 8. Preserve physical EXE size unless a separately reviewed code-space plan explicitly permits expansion.
+
+## `EDIT-HYPER-02`: reset hyperspace counters at round start
+
+### Confirmed defect
+
+The framebuffer and copied entity state are rebuilt for a new round, but the
+left/right hyperspace counters at `DS:0060/0061` lie outside the copied range
+and are not reset. A full-speed trace caught a new round drawing active ships
+with both counters already nonzero. The stale left effect later completed
+against a visible active ship, replaced its render coordinates, and stranded
+two left-ship XOR images.
+
+### Selected first implementation
+
+Clear both counters at round start, before the initial ships are drawn and
+before the gameplay timer can advance an inherited effect:
+
+```text
+before new-round initial drawing:
+    left_hyperspace_counter = 0
+    right_hyperspace_counter = 0
+```
+
+The bytes are adjacent at `DS:0060/0061`, so the implementation can treat them
+as one zeroed word if instruction placement permits. No particle-array clearing
+is required for this fix: game entry already clears the framebuffer, and each
+legitimate later particle consumer initializes its own entries before use.
+
+This deliberately fixes the confirmed new-round corruption without changing
+F1/frontend presentation or the ordinary same-round hyperspace cycle. Cancelling
+effects earlier at frontend or round-end entry remains a separate hardening
+option because it has additional visible-particle and shared-array semantics.
+
+### Validation criteria
+
+1. Use the original-binary manual reproduction: enter left or right hyperspace,
+   press F1 while particles remain active, start a new round, and prove both
+   counters are zero before initial draws.
+2. Confirm no completion event can observe an active entity or visible ordinary
+   sprite unless a same-round trigger established the matching effect.
+3. Preserve normal left/right hyperspace duration, destination, particle
+   trajectories, re-entry coordinates, energy cost, and random-call cadence.
+4. Exercise immediate and delayed F2 restarts and confirm that menu dwell time
+   cannot affect the new-round result.
+5. Exercise F2 start, natural round end, F1 return, pause, and
+   simultaneous effects with gravity and planet options independently varied.
+6. Re-run the circular-trace decoder and require zero initial draws with
+   nonzero counters, zero active-entity completions, and zero visibility
+   failures over a bounded repeated-relaunch pilot.
 
 ## Computer-player difficulty proposals
 

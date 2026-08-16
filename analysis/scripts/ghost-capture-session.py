@@ -116,6 +116,21 @@ def build_parser() -> argparse.ArgumentParser:
         "type-cga-dump", help="type the bounded CGA dump without pressing Enter"
     )
 
+    trace_dump = commands.add_parser(
+        "type-trace-dump",
+        help="type the diagnostic circular-trace dump without pressing Enter",
+    )
+    trace_dump.add_argument("cs", type=hex_segment)
+
+    commands.add_parser(
+        "guest-option-sequence",
+        help="focus DOSBox once and press the fresh-frontend F3/F4/F6 sequence",
+    )
+    commands.add_parser(
+        "capture-options",
+        help="capture the exact DOSBox window for one local option-row check",
+    )
+
     guest_key = commands.add_parser(
         "guest-key", help="focus DOSBox and send one named X11 key"
     )
@@ -396,6 +411,28 @@ def input_action(state: dict[str, object], target: str, action: list[str]) -> No
     print(result.stdout.strip())
 
 
+def capture_options(state: dict[str, object]) -> None:
+    validate_state(state)
+    input_action(state, "dosbox", ["focus"])
+    capture_tool = shutil.which("import", path=os.defpath)
+    if not capture_tool:
+        raise SessionError("the exact-window screenshot helper is unavailable")
+
+    destination = STATE_DIR / f"{state['session_id']}-options.png"
+    if destination.exists():
+        raise SessionError(
+            "an option-check image already exists for this session; inspect it "
+            "instead of replacing evidence"
+        )
+    window = int(state["dosbox_window"])
+    run_command([capture_tool, "-window", f"0x{window:x}", str(destination)])
+    destination.chmod(0o600)
+    print(
+        "Option-check image captured: "
+        f"{destination.relative_to(PROJECT_DIR).as_posix()}"
+    )
+
+
 def print_status(state: dict[str, object]) -> None:
     validate_state(state)
     print("Capture session is active and both window identities are valid.")
@@ -465,6 +502,16 @@ def main() -> int:
         input_action(state, "debugger", ["text", f"memdumpbin {arguments.ds}:0000 2ab0"])
     elif arguments.command == "type-cga-dump":
         input_action(state, "debugger", ["text", "memdumpbin b800:0000 4000"])
+    elif arguments.command == "type-trace-dump":
+        input_action(
+            state,
+            "debugger",
+            ["text", f"memdumpbin {arguments.cs}:2e00 c010"],
+        )
+    elif arguments.command == "guest-option-sequence":
+        input_action(state, "dosbox", ["keys", "F3", "F4", "F6"])
+    elif arguments.command == "capture-options":
+        capture_options(state)
     elif arguments.command == "guest-key":
         input_action(state, "dosbox", ["key", arguments.key])
     elif arguments.command == "close":

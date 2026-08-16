@@ -2,40 +2,47 @@
 
 ## Status and outcome
 
-The first static gate is complete. The audit found no direct overlap or state
-write from either `EDIT-CPU-06` lead prototype into rendering or hyperspace
-state. It did find one definite transient invariant gap in the original
-hyperspace entry sequence and one conditional way for that gap to become a
-stranded XOR ship image:
+The static gate and full-speed diagnostic follow-up are complete. The audit
+found no direct overlap or state write from either `EDIT-CPU-06` lead prototype
+into rendering or hyperspace state. The diagnostic trace then confirmed a
+round-lifecycle defect in the investigated executable: game entry clears the
+framebuffer and copies fresh entity state, but leaves the two hyperspace
+counters outside that copy unchanged.
 
-1. A hyperspace trigger makes a ship inactive and clears its dirty byte before
-   the ordinary ship sprite is necessarily erased. The old sprite remains until
-   the next foreground pass notices the inactive entity.
-2. Hyperspace completion assumes that erasure has happened. It does not inspect
-   the sprite-visibility parity flag before replacing the previous-rendered
-   coordinates. If the flag were still set at completion, the next erase would
-   target the new coordinates and could leave the old sprite stranded.
+The resulting sequence is now established:
 
-The first condition is certain from the instruction order. The second is a valid
-failure sequence but is not yet shown to occur during ordinary gameplay: under
-normal scheduling, many foreground iterations should run during the 64-tick
-hyperspace effect and erase the old sprite. The observations therefore remain
-unexplained, but runtime work can begin with a few narrow lifecycle checks rather
-than a large state logger.
+1. A round can end with `DS:0060` or `DS:0061` still nonzero.
+2. Frontend and game entry clear old pixels, but neither resets those counters.
+   The frontend may also reuse their shared particle arrays for the title.
+3. A new round draws active, visible ships while the old effect remains
+   logically active.
+4. The gameplay timer resumes the stale effect. Its completion assumes that the
+   corresponding ship is absent and its ordinary sprite parity is zero, then
+   replaces current and previous-rendered coordinates.
+5. Because the new ship is active and visible, that replacement breaks the XOR
+   render invariant and strands ship images at the old and particle-derived
+   coordinates.
+
+The earlier entry deferred-erase gap remains real, and completion's assumption
+about visibility remains the immediate parity failure. The trace explains how
+completion can violate that assumption despite many foreground iterations: it
+is completing an effect inherited from an earlier round against a newly active
+ship, not racing the ordinary entry from the same round.
 
 A separate shared-array hazard exists if a round ends while hyperspace is active.
 The round-end effect and timer-driven hyperspace then use overlapping particle
-arrays without mutual exclusion. This is a real code-design risk, but it is a
-weaker match for the reported sightings. The first captured anomaly is now
-explicitly known to have appeared during a live match rather than at round end.
+arrays without mutual exclusion. This is a real code-design risk adjacent to the
+confirmed cause. The visible ghosts appear during later live play, but the trace
+shows that the causal state survives from an effect active across the preceding
+round transition.
 
 ## Evidence boundary
 
-This audit re-read the original executable's instruction-aligned foreground,
+The static portion re-read the original executable's instruction-aligned foreground,
 hyperspace, timer, drawing, and round-end paths, then compared the owned regions
 and register behavior of the earlier lead-only and expanded gravity-aware
-`EDIT-CPU-06` patchers. It did not run the executable, capture memory, or claim
-that a candidate sequence has been reproduced.
+`EDIT-CPU-06` patchers. The later runtime portion used a gravity-only diagnostic
+copy with bounded in-memory lifecycle records and archived state/CGA captures.
 
 The planet option was disabled in both reported sightings, and the visible
 effect was away from the planet location. Planet drawing, gravity-independent
@@ -52,14 +59,10 @@ rate: the exact build hashes, number of runs per build, number of hyperspace
 events, event-by-event outcomes, and whether the estimate refers to runs or
 individual launches were not recorded.
 
-The observation strengthens the association with hyperspace shortly after game
-entry and weakens explanations that require a planet interaction or an observed
-round transition. If the effect is visible immediately around entry, it also
-fits the definite deferred-erase window better than the conditional completion
-failure, which would require the ordinary erase to remain missing across the
-full hyperspace cycle. The original executable's inclusion in the comparison is
-important, but it is not yet evidence that the original independently exhibited
-the effect until the per-build outcomes are separated.
+The observation strengthened the association with hyperspace shortly after
+game entry and weakened explanations that require a planet interaction. At this
+stage it did not independently establish an original-executable outcome; the
+later controlled F1/F2 reproduction below now supplies that evidence.
 
 ## State involved
 
@@ -207,10 +210,12 @@ path that can prevent the ordinary next-pass erasure assumed by hyperspace
 entry. The later screen transition may hide the damage, but this interaction is
 a concrete defect candidate for any sighting near a death or round transition.
 
-No evidence currently connects a reported sighting to a round end. The first
-captured anomaly was explicitly not observed during that transition. This
-candidate should remain behind the ordinary entry/completion check unless a
-future observation includes shield depletion, destruction, or a score change.
+The diagnostic trace now connects the persistent counters to a preceding round
+transition, although it does not prove that shared-array interference is needed
+to create the later ghosts. Counter survival alone is sufficient: after game
+entry draws fresh active ships, the stale timer effect violates completion's
+entity/visibility assumptions. A robust repair should nevertheless cancel the
+effect before round-end code reuses the arrays.
 
 ## Lead-edit audit
 
@@ -280,35 +285,114 @@ A focused transition re-check narrows that interpretation. Game entry copies
 the template and then calls the full `0x4000`-byte CGA clear at `CS:1CD3` before
 drawing the new background and initial ships. Frontend entry calls the same
 clear before rebuilding its display. A completed restart therefore cannot
-carry either stale image into the new round. The `(161,46)` frame-zero image is
-instead consistent with the initial left ship moving one pixel and then being
-stranded by a very early left hyperspace lifecycle. The exact creation event is
-still unobserved.
+carry old framebuffer pixels into the new round. It can, however, carry the
+logical counters at `DS:0060/0061`, which lie outside the copied state and are
+not cleared by either transition. The later instrumented run confirmed that
+this surviving state recreates stale images after the new screen is built.
 
 The operator later clarified the run history: several earlier
 CPU-versus-CPU matches ended naturally, then new matches were launched until the
 anomaly appeared during ordinary live play. It did not appear at round end.
-Together with the full framebuffer clears, this separates the captured defect
-from those earlier matches and further deprioritizes the round-end shared-array
-hazard for this sighting.
+The later trace explains that observation: the transition hides old pixels but
+preserves active effect counters, so the visible corruption is created only
+after the new round begins.
+
+## Instrumented reproduction and confirmed cause
+
+A gravity-only diagnostic copy reproduced the anomaly on the third
+CPU-versus-CPU round, within approximately the first second. The frozen trace,
+data segment, and CGA image were captured without resuming between dumps.
+
+The 2,048-record circular buffer had wrapped normally, with no incomplete
+records or sequence gaps. Its decisive sequence was:
+
+- a preceding round ended with active hyperspace; the counters later visible at
+  the new-round boundary were left `44` and right `8`;
+- initial left and right ship draws in the fresh round occurred at trace
+  sequences 8221 and 8222 while both counters were still nonzero;
+- at sequence 8293, stale left completion saw entity state one, visibility one,
+  dirty zero, and current/previous position `(164,46)`;
+- completion replaced that position with particle result `(59,131)`, after
+  which XOR/snapshot activity stranded left frame-zero sprites at both
+  coordinates; and
+- a later right request entered hyperspace while its inherited counter was
+  already `53`, incrementing it to `54` rather than starting at one.
+
+At capture, the current right ship was a legitimate frame at `(226,137)`. The
+two apparent ghosts were instead perfect `56/56` left frame-zero masks at
+`(164,46)` and `(59,131)`, matching the operator's corrected identification of
+the affected player as left.
+
+The decoder reported 65 hyperspace ticks while the corresponding ship entity
+was active, one completion with an active entity and visible ordinary sprite,
+one malformed later entry caused by an already nonzero counter, three initial
+draws with a nonzero hyperspace counter, and no snapshot-coordinate invariant
+failures. This confirms the counter carry-over as the root lifecycle defect and
+the completion parity failure as its downstream rendering mechanism.
+
+### Original-executable manual reproduction
+
+The same defect was subsequently reproduced several times in human-versus-human
+mode on the unmodified original executable, SHA-256
+`2fe23087c3d98dfd94e665250cb3c944fb0e210490ead5ec8849dfb0aaf3a490`:
+
+1. Start a round.
+2. Put either ship into hyperspace.
+3. Press F1 while its particle effect is still active.
+4. Start another round with F2.
+5. Let the affected ship begin moving.
+
+The remainder of the old particle effect appears during the new round and a
+ghost is stranded at that ship's default starting position. Waiting different
+amounts of time in the frontend did not advance the suspended effect. This is
+consistent with the code ownership: only the gameplay timer advances
+`DS:0060/0061`; the frontend timer leaves both counters unchanged.
+
+The eventual live ship position can resemble the prior destination but is not
+the actual selected coordinate and varied between repetitions. Normal
+completion already restores from the first particle's final coordinate rather
+than the exact selection. Across this boundary the new-round template also
+replaces the ship velocity words that held the common destination drift, and
+frontend display work may reuse the shared particle arrays. The surviving
+counter therefore resumes an inconsistent mixture of old effect data and new
+round state. The default-start ghost has a simpler explanation: game entry
+draws the fresh ship at its template position before stale completion replaces
+the render coordinates.
+
+This reproduction closes the remaining attribution question: the lifecycle
+defect exists in the original executable and does not require a prototype edit.
+
+## Completion-check history
+
+Eight left completion stops at `CS:2630` were collected across two launches of
+the exact gravity-only build. Each found visibility, dirty, and entity state
+zero, and no stop showed a visible ghost. These bounded observations do not
+prove that the conditional completion sequence is impossible, but they did not
+reproduce it and breakpoint stops may change the foreground/timer phasing.
+
+Those clean stopped samples are consistent with ordinary same-round
+hyperspace. They did not exercise stale counters inherited by a fresh round,
+which is why the later full-speed circular trace found the failure.
 
 ## Ranked candidates
 
 | Rank | Candidate | Static confidence | Match to observations | Minimal next check |
 |---:|---|---|---|---|
-| 1 | Completion occurs while the ordinary visibility bit is still one, then overwrites the old render snapshot | High consequence; occurrence not yet observed | The captured framebuffer proves two untracked left sprites while the current left draw is consistent | Break only at left completion and inspect visibility plus the old and replacement snapshots |
-| 2 | Deferred ordinary-ship erasure lets a timer movement display hyperspace particles while the old sprite remains | High | The frame-zero image one pixel from the initial left position fits a very early entry, but the short interval alone does not explain two lasting images | Observe left visibility parity at counter activation, first particle tick, and the next inactive foreground erase |
-| 3 | Round-end foreground animation races an active timer hyperspace effect in the shared 90-entry arrays | High | A real separate hazard, but the captured anomaly appeared during live play and not at round end | Defer to a separate controlled round-end-during-hyperspace case |
-| 4 | Round or frontend entry carries a stale image into the next screen | Low after transition re-check | Both entries clear the full CGA aperture before drawing new content | No runtime priority unless a controlled restart contradicts the clear path |
-| 5 | Simultaneous CPU hyperspace leaves both old ordinary sprites visible for one foreground iteration | High | The capture is CPU versus CPU, but only the right counter was active at the stop and the lasting images are left sprites | Record both counters and visibility bits at entry |
-| 6 | Lead helper changes foreground/timer phasing and exposes an original timing window | Medium | Timing exposure remains possible, but the captured build has gravity only rather than the lead patch | Compare matched original and gravity-edited lifecycle checks before attributing causality |
-| 7 | Prototype code directly corrupts hyperspace or render state | Low | The captured stale left sprites do not map to a known gravity-patch write | Revisit only if a patched lifecycle differs with identical pre-state |
-| 8 | Planet renderer or collision interaction | Low | The capture independently confirms planet disabled | Keep planet disabled in the next matched control |
+| 1 | Hyperspace counters survive the round/frontend boundary and resume against fresh active ships | Confirmed | The full-speed trace records nonzero counters at initial draws and an active-visible completion that produces the captured sprite coordinates | Design a guarded transition-state reset and validate repeated early relaunches |
+| 2 | Same-round completion occurs while the ordinary visibility bit is still one | High consequence; not observed independently | This is the downstream mechanism in the confirmed cross-round sequence, but eight ordinary completion stops were clean | Retain as an invariant when validating the transition reset |
+| 3 | Deferred ordinary-ship erasure lets a timer movement display hyperspace particles while the old sprite remains | High | Real transient window, but the confirmed lasting ghosts came from inherited counter state | Keep as a separate possible one-frame visual blip |
+| 4 | Round-end foreground animation races an active timer hyperspace effect in the shared 90-entry arrays | High | A real related hazard, but the confirmed F1/F2 ghost requires only a retained counter | Track separately; it is not required for the selected round-start reset |
+| 5 | Old framebuffer pixels cross a completed transition | Disproved for the captured path | Both entries clear the full CGA aperture; only logical effect state crosses | Preserve the framebuffer-clear check in validation |
+| 6 | Lead helper changes foreground/timer phasing and exposes an original timing window | Medium | Timing can change incidence, but the captured build has gravity only and the lifecycle defect is original code | Compare unmodified incidence only if attribution is needed |
+| 7 | Prototype code directly corrupts hyperspace or render state | Low | No relevant prototype write; the defective counters and transitions are original paths | Revisit only if a patched lifecycle differs with identical pre-state |
+| 8 | Planet renderer or collision interaction | Low | The capture independently confirms planet disabled | Keep planet disabled in transition-reset validation |
 
-## Narrow runtime handoff
+## Narrow runtime handoff history
 
-The audit does not justify heavy state capture as the first runtime action. Use
-the existing debugger workflow for these bounded checks:
+The original post-audit handoff used the following bounded checks before
+escalating to a circular trace. The completion check in step 3 produced eight
+clean samples. The circular trace later superseded the unresolved handoff and
+recovered the transition ordering.
 
 Before interpreting another percentage, keep a one-line local record per run:
 exact executable hash, options, play mode, elapsed time to each hyperspace entry,

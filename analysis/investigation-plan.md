@@ -232,18 +232,17 @@ A CPU-versus-CPU observation showed a brief visible duplicate or stale rendering
 of both ships while the computer players continued responding to the real ship
 state. A later human-versus-right-computer observation also affected both ships:
 the computer player entered hyperspace shortly after gameplay began, followed by
-the ghost rendering. This broadens the issue beyond CPU-versus-CPU play. Treat
-the hyperspace timing as a possible correlation, not yet a confirmed cause, and
-treat the overall anomaly as an unconfirmed rendering defect until it can be
-reproduced under controlled conditions. The observations suggest visual state
-diverged from the live entity arrays rather than a second logical ship being
-created.
+the ghost rendering. This broadens the issue beyond CPU-versus-CPU play. A later
+full-speed diagnostic reproduction confirmed that the visual state diverges
+from the live entity arrays: hyperspace counters survive a round transition and
+resume against newly initialized ships, eventually breaking XOR sprite parity.
 
 Both sightings were on edited executables: first on the earlier lead-only build,
 then on the expanded gravity-aware lead build. It is therefore possible that an
-edit introduced the anomaly, changed timing enough to expose an existing race,
-or merely made a pre-existing defect easier to notice. These descriptive build
-names are not sufficient evidence by themselves; each future run must record the
+edit changed timing enough to alter how often the underlying defect appears.
+The confirmed counter and transition paths belong to the original executable,
+and no relevant prototype write was found, but incidence in an unmodified build
+has not been measured separately. Each future attribution run must record the
 exact input hash, generated-output hash, enabled game options, and patch set.
 The planet option was disabled in both observations, and the visible anomaly was
 not near the planet's location. Planet drawing and collision should therefore be
@@ -291,8 +290,10 @@ The completed audit and its ranked candidates are recorded in
 [the ghost-rendering static audit](ghost-rendering-static-audit.md). It found a
 definite deferred ordinary-ship erase at hyperspace entry, a conditional stranded
 sprite if completion sees the visibility bit still set, and a separate round-end
-particle-array race. The next gate is a narrow visibility-bit lifecycle check,
-not broad state capture.
+particle-array race. Eight clean completion stops across two gravity-only
+launches did not reproduce the anomaly. The later full-speed circular trace did:
+it proved that nonzero hyperspace counters cross a round/frontend boundary and
+resume against fresh active ships.
 
 The exact uninstrumented snapshot and archival procedure is recorded in the
 [ghost-rendering capture runbook](ghost-rendering-capture-runbook.md). The
@@ -316,11 +317,12 @@ frame-zero images at `(161,46)` and `(58,99)`. This resolves the visual
 classification as stale XOR ship images and redirects the next bounded checks
 toward earlier left hyperspace entry and completion. A follow-up transition
 check confirmed that both frontend and game entry clear the full CGA aperture,
-so completed matches cannot carry the ghosts into a later launch. The operator
-confirmed that earlier CPU-versus-CPU matches ended naturally and that the
-captured anomaly appeared during a later live match, not at round end. This
-further deprioritizes the separate round-end particle-array hazard for the
-captured defect.
+so old pixels cannot cross into a later launch. The instrumented reproduction
+corrected the remaining inference: logical hyperspace counters can cross that
+boundary and recreate ghosts in the fresh framebuffer. The operator confirmed
+that earlier CPU-versus-CPU matches ended naturally and that the visible
+anomaly appeared during later live play, which matches the resumed-effect
+sequence.
 
 #### Logging-first reproduction plan
 
@@ -363,6 +365,21 @@ to capture.
    bounded debugger experiment around that one transition. Use instruction logs
    only for the small interval required to decide whether an erase, snapshot,
    draw, or hyperspace state change was missing or reordered.
+
+The fallback in step 3 is now active. The first implementation is intentionally
+one exact build cell: the gravity-only executable identified by SHA-256
+`a8be13c10e4440615692b1a4dd580a9569cfc8a6178f7f9f434c0b0ea8bc8d50`,
+CPU versus CPU, gravity enabled, and planet disabled. Its diagnostic copy keeps
+all existing offsets, appends trace code and storage in the current code segment,
+and does not compose the computer-player edits.
+
+The version-1 trace uses a 16-byte header and 2,048 24-byte circular records at
+`CS:2E00..EE0F`. It records ship-side hyperspace entry, particle tick,
+pre-completion, actual XOR, and completed render-snapshot boundaries. Each
+record includes sequence/tick ordering, both hyperspace counters, the selected
+ship's visibility, dirty/entity, angle, action/latch, flags, and current plus
+previous-rendered coordinates. Event reservation is the only briefly atomic
+portion; record filling permits normal timer nesting and commits last.
 
 #### State-capture mechanics
 
@@ -421,15 +438,16 @@ foreground timing and the complete intervening random-call order also matter.
 - [ ] Recover or regenerate each observed edited build from its patcher and record its exact hash; do not rely on a descriptive filename.
 - [ ] Build a local batch runner and compact run-manifest format, with all raw outputs kept under ignored paths.
 - [ ] Separate the informal early-hyperspace observation into exact per-build numerators and denominators before treating the estimated 30% as an incidence rate.
-- [ ] Define the fixed-width event schema and local decoder before instrumenting an executable, including explicit segment/range ownership for the circular buffer.
+- [x] Define the fixed-width event schema and local decoder before instrumenting an executable, including explicit `CS:2E00..EE0F` ownership for the circular buffer.
 - [x] Rehearse debugger register, data-segment, and CGA framebuffer dumps on an ordinary non-anomalous run so a rare sighting is not lost to an untested capture step. Circular-buffer capture remains conditional on snapshot results. See [the capture runbook](ghost-rendering-capture-runbook.md).
 - [ ] Complete a small pilot across the original, lead-only, and expanded gravity-aware builds before choosing a larger run count.
-- [ ] Reproduce the blip under bounded CPU-versus-CPU and human-versus-right-computer runs, including immediate-start hyperspace cases, and record the active options, transition, hyperspace, collision, and destruction state immediately before it appears.
+- [x] Reproduce the blip under a bounded CPU-versus-CPU diagnostic run and record the active options and causal hyperspace/transition state. A human-versus-right-computer comparison is no longer required to recover the cause.
 - [x] Distinguish a stale ship sprite from a background pixel cluster, particle effect, emulator presentation artefact, or an XOR erase/redraw at two valid adjacent positions. The first raw-CGA capture proves two untracked left frame-zero sprites.
 - [x] Correlate current position, previous-rendered position, current/previous angle, dirty state, cloak, entity state, and hyperspace counter for both ship slots in the first anomaly snapshot.
 - [ ] Investigate whether a gameplay timer interrupt between foreground erase, snapshot, and redraw steps can leave an unmatched XOR sprite despite the existing short `CLI` snapshot section.
-- [ ] Check frontend/game, pause, hyperspace, round-end, and destruction transitions for paths that clear or replace state without erasing the last visible ship image.
-- [ ] Recover the minimal event sequence, the condition that clears the ghost, and whether the issue exists in the original executable or only a particular prototype.
+- [x] Check frontend/game, hyperspace, and round-end transitions for state that survives the framebuffer clear. The two hyperspace counters are outside the copied round state and are not reset.
+- [x] Recover the minimal event sequence that creates the ghost and reproduce it repeatedly on the original executable in human-versus-human mode: start hyperspace, press F1 while it is active, then press F2 for a new round.
+- [ ] Determine which later redraw or screen transition naturally clears an already stranded sprite, and measure original-executable incidence only if complete behavior attribution is needed.
 
 ### Cloak-aware computer-player targeting
 
@@ -547,8 +565,17 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Made any focus or input failure a hard runbook pause. Automated retries and fallback global input are prohibited; the user must be notified, focus must be explicitly restored and verified, and any partial debugger text must be inspected before the failed action can be retried.
 - Extended managed session state with the exact source-executable SHA-256 so every evidence run begins with an ignored, reproducible build identity rather than only a descriptive filename.
 - Added `EDIT-CPU-09` trouble-aware hyperspace and `EDIT-CPU-10` confidence-gated photons as energy-efficiency proposals.
-- Captured the first ghost-rendering anomaly without lifecycle breakpoints and added a local raw-CGA/state decoder. The dump proved CPU-versus-CPU, gravity-on, planet-off state with right hyperspace at counter `20h`; the right ordinary sprite was correctly absent, the current left sprite was consistent, and two additional left frame-zero sprites were stranded outside all tracked coordinates. One lies one pixel from the normal left start position. Both frontend and game entry clear the complete framebuffer, so the next checks prioritize early left hyperspace entry and completion rather than persistence across a completed restart.
+- Captured the first ghost-rendering anomaly without lifecycle breakpoints and added a local raw-CGA/state decoder. The dump proved CPU-versus-CPU, gravity-on, planet-off state with right hyperspace at counter `20h`; the right ordinary sprite was correctly absent, the current left sprite was consistent, and two additional left frame-zero sprites were stranded outside all tracked coordinates. One lies one pixel from the normal left start position. Both frontend and game entry clear the complete framebuffer, proving old pixels cannot cross a completed restart; the later trace showed that logical hyperspace state can cross and recreate them.
 
 ### 2026-08-16
 
-- Clarified the first anomaly run history: preceding CPU-versus-CPU matches ended naturally, new matches were launched, and the captured ghost appeared during ordinary live play rather than at round end. Combined with the full frontend/game framebuffer clears, this separates the stale sprites from earlier matches and deprioritizes the round-end shared-particle hazard for this sighting.
+- Clarified the first anomaly run history: preceding CPU-versus-CPU matches ended naturally, new matches were launched, and the captured ghost appeared during ordinary live play rather than visibly at round end. This initially seemed to separate the sighting from earlier matches; the later trace corrected that inference by showing logical hyperspace counters crossing the cleared-screen boundary.
+- Inspected eight left hyperspace completions across two launches of the exact gravity-only build. Every stop had zero left visibility, dirty, and entity state, and none coincided with a ghost. This did not reproduce the conditional completion failure and triggered the planned full-speed circular-logging fallback.
+- Implemented the first ignored diagnostic trace build and local decoder. The build records both ships' hyperspace entry/tick/completion, actual ship XOR, and render-snapshot events in 2,048 fixed-width in-memory records without DOS or file calls during gameplay. The decoder reports compact invariant counts and a bounded recent-event window.
+- Recorded a synthetic-input hazard discovered while ending the second completion run: a 25 ms F1 tap can plausibly span the live-game-to-frontend transition and then request frontend exit. Full-speed diagnostic runs now use natural round endings, F2 relaunches, or fresh disposable sessions instead of live F1 recycling.
+- Reproduced the ghost on the third full-speed diagnostic round and captured trace, data, CGA, and narrow screenshots without resuming. The corrected visual report and sprite-mask matching both identify two left-player ghosts.
+- Confirmed the causal sequence: a prior round ended with active hyperspace; `DS:0060/0061` survived frontend and game initialization; the fresh round drew active ships with counters left `44` and right `8`; stale left completion then observed entity and visibility both set, replaced `(164,46)` with particle result `(59,131)`, and stranded perfect left frame-zero masks at both coordinates. A later right trigger also began from a stale counter.
+- Added `EDIT-HYPER-02` as the proposed transition-state repair, separating the minimal new-round counter reset from the more careful round-end particle-cancellation design.
+- Added one-shot F3/F4/F6 startup input for confirmed fresh frontends. It raises the exact DOSBox window, verifies focus before each longer key press, captures that exact window once for an option-row check, and keeps F2 separate; any partial sequence failure remains a hard stop because the keys are toggles.
+- Reproduced the defect several times on the unmodified original in human-versus-human mode with the minimal hyperspace, F1, F2 sequence. The effect remains frozen regardless of frontend wait time and resumes only when the gameplay timer returns. The resulting ghost is the freshly drawn default-start ship; the live landing point can resemble the previous destination but varies and is not the exact selected coordinate.
+- Selected the minimal `EDIT-HYPER-02` behavior: clear the adjacent left/right counters at round start before initial ship drawing. Particle-array clearing and earlier transition cancellation are outside the first fix.

@@ -282,7 +282,7 @@ The frontend timer owns F1-F8 option handling. Edge-latch bits prevent a held ke
 
 Game entry at `CS:00BC` resets `SP`, clears pause, copies `0x360` bytes from the embedded template at `DS:0950` into live state at `DS:0CBC`, clears and rebuilds the game screen, resets the keyboard table, and installs `CS:233D` as vector 8.
 
-The round template initializes two ships and fourteen projectile slots. Session-level values outside that copy, including the shared tick and score fields, can persist across round/front-end transitions.
+The round template initializes two ships and fourteen projectile slots. Session-level values outside that copy, including the shared tick, score fields, and hyperspace counters at `DS:0060/0061`, can persist across round/front-end transitions. A later instrumented reproduction proved that the two counters are not harmless session state: if a round ends during hyperspace, a new round can draw active ships while the inherited effects remain logically active. Their timer-owned completion then replaces live ship render coordinates and can strand XOR sprites. The complete evidence is in [the focused ghost-rendering audit](ghost-rendering-static-audit.md#instrumented-reproduction-and-confirmed-cause).
 
 ### One foreground iteration
 
@@ -354,6 +354,25 @@ Coordinates wrap across the full `640 x 200` screen. At old counter value `20h`,
 The counter boundary makes the exact trajectory slightly asymmetric: 31 movement steps use the original random components, 32 use their negations, and the shared destination drift runs for 63 steps. The particles therefore converge near the initially selected destination rather than mathematically meeting at it. One reversed random step remains in each particle's final displacement, and the first particle determines the actual restored ship coordinate.
 
 This differs from both other users of the arrays. The frontend title disperses 90 glyph tiles for 30 foreground frames and exactly reverses them for 30 frames to reconstruct `SPACEWAR`; the round-end effect moves all 90 entries as pixels for 128 foreground frames and then erases them. Hyperspace uses neither routine even though the mutable storage and random-velocity initializer are shared.
+
+The effect counters are outside the `0x360`-byte round-template copy. Frontend
+entry and game entry clear the CGA framebuffer but do not clear those counters.
+Consequently, ending a round with an active effect can leave a nonzero counter
+pointing at arrays that the frontend and round-end display code may have reused.
+The frontend timer does not execute the hyperspace update, so menu dwell time
+does not advance the suspended effect. When the gameplay timer is installed for
+the next round, it resumes that stale effect against newly active, visible
+ships. Repeated original-executable F1/F2 tests confirm that the remaining
+particle animation then runs and a ghost is stranded at the affected ship's
+default start position.
+
+The eventual ship position may loosely resemble the previous destination, but
+it is not reliable. Game initialization replaces the velocity words used as the
+effect's common destination drift, frontend work can reuse the particle arrays,
+and completion always chooses the first particle's final coordinate rather than
+the selected destination itself. This confirmed cross-round lifecycle defect is
+therefore distinct from old pixels surviving a clear: logical effect state
+survives and creates new parity errors in the fresh framebuffer.
 
 ### Gravity calculation
 

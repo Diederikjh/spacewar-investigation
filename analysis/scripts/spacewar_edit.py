@@ -156,6 +156,42 @@ def validate_original(data: bytes) -> None:
         raise PatchError("trailing physical padding is not entirely zero")
 
 
+def mz_declared_size(data: bytes) -> int:
+    """Return the byte length encoded by an MZ header."""
+
+    if len(data) < 0x1C or data[:2] != b"MZ":
+        raise PatchError("input does not have a complete MZ header")
+    final_page_bytes, pages = struct.unpack_from("<HH", data, 0x02)
+    if pages == 0:
+        raise PatchError("MZ page count is zero")
+    if final_page_bytes > 0x1FF:
+        raise PatchError("MZ final-page byte count is invalid")
+    return (pages - 1) * 0x200 + (final_page_bytes or 0x200)
+
+
+def validate_exact_mz_image(
+    data: bytes,
+    *,
+    expected_sha256: str,
+    expected_file_size: int,
+    expected_declared_size: int,
+) -> None:
+    """Guard an explicitly identified derived MZ image and its zero tail."""
+
+    if sha256_hex(data) != expected_sha256:
+        raise PatchError("input SHA-256 does not match the required derived executable")
+    if len(data) != expected_file_size:
+        raise PatchError(
+            f"input physical size is not exactly 0x{expected_file_size:X} bytes"
+        )
+    if mz_declared_size(data) != expected_declared_size:
+        raise PatchError("input MZ-declared size does not match the guarded layout")
+    if not 0 <= expected_declared_size <= len(data):
+        raise PatchError("guarded MZ-declared size is outside the physical file")
+    if any(data[expected_declared_size:]):
+        raise PatchError("derived executable's trailing physical padding is not zero")
+
+
 def apply_regions(data: bytes, regions: Iterable[PatchRegion]) -> bytes:
     """Apply guarded regions and preserve size and the original word sum."""
 
@@ -207,14 +243,61 @@ def apply_image_extension(
     """Replace the old physical padding and extend the loaded MZ image."""
 
     validate_original(data)
-    if tail_file_offset != DECLARED_FILE_SIZE:
+    return _apply_validated_image_extension(
+        data,
+        regions,
+        image_tail,
+        tail_file_offset=tail_file_offset,
+        code_file_base=CODE_FILE_BASE,
+    )
+
+
+def apply_exact_image_extension(
+    data: bytes,
+    regions: Iterable[PatchRegion],
+    image_tail: bytes,
+    *,
+    expected_sha256: str,
+    expected_file_size: int,
+    expected_declared_size: int,
+    tail_file_offset: int,
+    code_file_base: int = CODE_FILE_BASE,
+) -> bytes:
+    """Extend one exact derived MZ image without weakening its identity guard."""
+
+    validate_exact_mz_image(
+        data,
+        expected_sha256=expected_sha256,
+        expected_file_size=expected_file_size,
+        expected_declared_size=expected_declared_size,
+    )
+    return _apply_validated_image_extension(
+        data,
+        regions,
+        image_tail,
+        tail_file_offset=tail_file_offset,
+        code_file_base=code_file_base,
+    )
+
+
+def _apply_validated_image_extension(
+    data: bytes,
+    regions: Iterable[PatchRegion],
+    image_tail: bytes,
+    *,
+    tail_file_offset: int,
+    code_file_base: int,
+) -> bytes:
+    """Apply an extension after the caller has validated the complete input."""
+
+    if tail_file_offset != mz_declared_size(data):
         raise PatchError("image extension must begin at the old declared end")
     old_tail_size = len(data) - tail_file_offset
     if len(image_tail) <= old_tail_size:
         raise PatchError("image extension must increase the physical file size")
 
     new_size = tail_file_offset + len(image_tail)
-    same_segment_limit = CODE_FILE_BASE + 0x10000
+    same_segment_limit = code_file_base + 0x10000
     if new_size > same_segment_limit:
         raise PatchError("image extension would exceed the current code segment")
 
