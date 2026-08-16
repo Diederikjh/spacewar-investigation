@@ -307,6 +307,21 @@ now launches with a unique title, associates DOSBox with the exact launched
 process, retains transient identifiers only in ignored state, and revalidates
 both identities before every runbook action.
 
+The first anomaly capture is now complete. The frozen state independently
+identified computer-versus-computer mode, gravity enabled, planet disabled, and
+a right hyperspace effect at counter `20h`. The tracked right sprite was
+correctly absent and the tracked left sprite was consistent. Raw-CGA matching
+against the embedded ship masks nevertheless proved two untracked left
+frame-zero images at `(161,46)` and `(58,99)`. This resolves the visual
+classification as stale XOR ship images and redirects the next bounded checks
+toward earlier left hyperspace entry and completion. A follow-up transition
+check confirmed that both frontend and game entry clear the full CGA aperture,
+so completed matches cannot carry the ghosts into a later launch. The operator
+confirmed that earlier CPU-versus-CPU matches ended naturally and that the
+captured anomaly appeared during a later live match, not at round end. This
+further deprioritizes the separate round-end particle-array hazard for the
+captured defect.
+
 #### Logging-first reproduction plan
 
 After the focused audit, use a staged approach so repeated attempts remain
@@ -410,8 +425,8 @@ foreground timing and the complete intervening random-call order also matter.
 - [x] Rehearse debugger register, data-segment, and CGA framebuffer dumps on an ordinary non-anomalous run so a rare sighting is not lost to an untested capture step. Circular-buffer capture remains conditional on snapshot results. See [the capture runbook](ghost-rendering-capture-runbook.md).
 - [ ] Complete a small pilot across the original, lead-only, and expanded gravity-aware builds before choosing a larger run count.
 - [ ] Reproduce the blip under bounded CPU-versus-CPU and human-versus-right-computer runs, including immediate-start hyperspace cases, and record the active options, transition, hyperspace, collision, and destruction state immediately before it appears.
-- [ ] Distinguish a stale ship sprite from a background pixel cluster, particle effect, emulator presentation artefact, or an XOR erase/redraw at two valid adjacent positions.
-- [ ] Correlate current position, previous-rendered position, current/previous angle, dirty state, cloak, entity state, and hyperspace counter for both ship slots.
+- [x] Distinguish a stale ship sprite from a background pixel cluster, particle effect, emulator presentation artefact, or an XOR erase/redraw at two valid adjacent positions. The first raw-CGA capture proves two untracked left frame-zero sprites.
+- [x] Correlate current position, previous-rendered position, current/previous angle, dirty state, cloak, entity state, and hyperspace counter for both ship slots in the first anomaly snapshot.
 - [ ] Investigate whether a gameplay timer interrupt between foreground erase, snapshot, and redraw steps can leave an unmatched XOR sprite despite the existing short `CLI` snapshot section.
 - [ ] Check frontend/game, pause, hyperspace, round-end, and destruction transitions for paths that clear or replace state without erasing the last visible ship image.
 - [ ] Recover the minimal event sequence, the condition that clears the ghost, and whether the issue exists in the original executable or only a particular prototype.
@@ -530,4 +545,10 @@ The investigation boundary, recommended semantics, implementation alternatives, 
 - Added a managed ghost-capture session driver. It launches a uniquely titled debugger, discovers DOSBox from the exact launched process, keeps process and window identifiers in ignored state, rejects ambiguous or recycled targets, exposes guarded runbook-specific commands, and closes only the validated disposable session.
 - Tightened dump archival so the `data` and `cga` labels enforce their exact expected sizes before the fixed debugger output is moved.
 - Made any focus or input failure a hard runbook pause. Automated retries and fallback global input are prohibited; the user must be notified, focus must be explicitly restored and verified, and any partial debugger text must be inspected before the failed action can be retried.
+- Extended managed session state with the exact source-executable SHA-256 so every evidence run begins with an ignored, reproducible build identity rather than only a descriptive filename.
 - Added `EDIT-CPU-09` trouble-aware hyperspace and `EDIT-CPU-10` confidence-gated photons as energy-efficiency proposals.
+- Captured the first ghost-rendering anomaly without lifecycle breakpoints and added a local raw-CGA/state decoder. The dump proved CPU-versus-CPU, gravity-on, planet-off state with right hyperspace at counter `20h`; the right ordinary sprite was correctly absent, the current left sprite was consistent, and two additional left frame-zero sprites were stranded outside all tracked coordinates. One lies one pixel from the normal left start position. Both frontend and game entry clear the complete framebuffer, so the next checks prioritize early left hyperspace entry and completion rather than persistence across a completed restart.
+
+### 2026-08-16
+
+- Clarified the first anomaly run history: preceding CPU-versus-CPU matches ended naturally, new matches were launched, and the captured ghost appeared during ordinary live play rather than at round end. Combined with the full frontend/game framebuffer clears, this separates the stale sprites from earlier matches and deprioritizes the round-end shared-particle hazard for this sighting.

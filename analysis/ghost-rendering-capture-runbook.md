@@ -33,9 +33,9 @@ Never assume that either the DOSBox client or debugger terminal retained focus.
 Use `analysis/scripts/ghost-capture-session.py` as the normal entry point. It
 launches a uniquely titled debugger terminal, obtains the exact DOSBox process
 identity from the launch script, discovers both X11 windows, and stores their
-transient identifiers only in ignored session state. Before every action it
-revalidates the DOSBox process/window relationship and the unique debugger
-title. It refuses ambiguous, stale, or recycled targets.
+transient identifiers and source-executable hash only in ignored session state.
+Before every action it revalidates the DOSBox process/window relationship and
+the unique debugger title. It refuses ambiguous, stale, or recycled targets.
 
 ```bash
 analysis/scripts/ghost-capture-session.py launch
@@ -217,8 +217,8 @@ guard above are required, not optional usability notes.
 For the first evidence run, avoid lifecycle breakpoints because they may change
 the timing being investigated:
 
-1. Create a unique run identifier and record the source path and SHA-256 before
-   launch.
+1. Use the managed session identifier and recorded source SHA-256 as the run
+   identity; record the intended play mode and options before starting play.
 2. Run the selected executable in the observed CPU-versus-CPU configuration.
 3. When the ghost becomes visible, use Alt+Pause immediately. Do not wait for
    hyperspace completion and do not press a guest key first.
@@ -255,8 +255,48 @@ state. The second is whether the corresponding visibility bit agrees with the
 image the foreground believes is present. A local decoder should produce only
 these fields, candidate sprite locations, and a short discrepancy summary.
 
+Run the repository-local decoder with the run identifier. `--write` also saves
+the complete report as `decoded.json` inside the ignored capture directory:
+
+```bash
+analysis/scripts/decode-ghost-capture.py RUN_ID --write
+```
+
+The decoder validates both dump sizes, records their hashes, decodes the named
+state, and tests the raw CGA framebuffer against all embedded left and right
+ship frames. Its candidate threshold is intended to identify likely sprites for
+human review, not to declare every partial cross-match a ghost.
+
 If the snapshot shows a parity/location mismatch, the next run should use the
 narrow completion or entry breakpoints from the static audit. If state and
 framebuffer agree despite the visible anomaly, prioritize emulator presentation
 or a transient partial redraw and add a short rolling local visual capture before
 instrumenting the executable.
+
+## First anomaly capture
+
+The first evidence capture completed on 2026-08-15 using the gravity-edited
+build, computer versus computer, gravity enabled, and the planet disabled. Raw
+evidence and its manifest remain local under the ignored capture directory.
+
+The stop occurred with the right effect at counter `20h`. Right entity, dirty,
+and visibility state were all zero, and none of the 47 bits in its tracked
+previous ship frame were present there. The right ordinary ship was therefore
+correctly absent at this instant.
+
+The left ship was active and consistently tracked at `(222,81)`: current and
+previous-rendered positions matched, visibility was one, dirty was zero, and
+59 of its 60 expected frame bits were present. The framebuffer also contained
+two left frame-zero images at `(161,46)` and `(58,99)`, matching 56/56 and 55/56
+sprite bits. Neither location appeared in the current or previous-rendered ship
+state. This establishes genuine stale left-ship XOR images rather than a
+particle cluster, background coincidence, or emulator-only presentation issue.
+
+One stale image is adjacent to the template's `(160,46)` left start position.
+Several preceding CPU-versus-CPU matches ended naturally, and the operator
+relaunched play until the anomaly appeared during a later live match. It was not
+observed at round end. Both frontend and game entry clear the complete CGA
+framebuffer before drawing their new screen, so those completed matches cannot
+have carried the images into the captured match. The next bounded checks should
+prioritize an early left hyperspace entry/completion within one match; the right
+hyperspace visible at capture may be concurrent rather than causal.

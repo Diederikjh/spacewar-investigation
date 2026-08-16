@@ -26,8 +26,8 @@ than a large state logger.
 A separate shared-array hazard exists if a round ends while hyperspace is active.
 The round-end effect and timer-driven hyperspace then use overlapping particle
 arrays without mutual exclusion. This is a real code-design risk, but it is a
-weaker match for the reported sightings because neither report included an
-observed round transition.
+weaker match for the reported sightings. The first captured anomaly is now
+explicitly known to have appeared during a live match rather than at round end.
 
 ## Evidence boundary
 
@@ -207,7 +207,8 @@ path that can prevent the ordinary next-pass erasure assumed by hyperspace
 entry. The later screen transition may hide the damage, but this interaction is
 a concrete defect candidate for any sighting near a death or round transition.
 
-No evidence currently connects either reported sighting to a round end. This
+No evidence currently connects a reported sighting to a round end. The first
+captured anomaly was explicitly not observed during that transition. This
 candidate should remain behind the ordinary entry/completion check unless a
 future observation includes shield depletion, destruction, or a score change.
 
@@ -240,17 +241,69 @@ computer player. It can lengthen the same foreground iteration after a left
 computer player triggers hyperspace, because right-player control occurs later
 in that iteration.
 
+## First uninstrumented anomaly snapshot
+
+An ignored gravity-edited run was frozen while the anomaly was visible and then
+captured without lifecycle breakpoints. The data itself records computer versus
+computer mode (`DS:1076 == 03`) with gravity enabled and the planet disabled
+(`DS:2040 == 02`). This corrects any visual assumption that the capture was a
+human-versus-computer round.
+
+At the stop, the right hyperspace counter was exactly `20h`. Right entity,
+dirty, and visibility state were zero. Its tracked previous-rendered position
+was `(228,153)`, angle `B5`, and embedded right frame 11; the CGA framebuffer
+contained zero of that frame's 47 set bits at the tracked location. The capture
+therefore does not exhibit the conditional right-completion parity failure.
+
+The left ship was active with visibility one and dirty zero. Current and
+previous-rendered positions both held `(222,81)`, current and previous angle
+both held `35`, and the framebuffer contained 59 of the expected 60 left frame
+3 bits at that location. This is a consistent ordinary ship draw.
+
+A scan using the executable's embedded ship masks found two additional left
+frame-zero images:
+
+| Coordinate | Matching sprite bits | Represented by live ship state? |
+|---:|---:|---|
+| `(161,46)` | `56/56` | No |
+| `(58,99)` | `55/56` | No |
+
+The near-complete masks and their absence from both current and
+previous-rendered coordinates establish stranded left-ship XOR images. They are
+not a 32-pixel hyperspace cluster, random-background interpretation, adjacent
+valid draw, or emulator presentation artefact. The first coordinate is next to
+the template's `(160,46)` left start position. The exact creation transition was
+not observed, and the concurrent right effect may merely have made the anomaly
+easier to notice.
+
+A focused transition re-check narrows that interpretation. Game entry copies
+the template and then calls the full `0x4000`-byte CGA clear at `CS:1CD3` before
+drawing the new background and initial ships. Frontend entry calls the same
+clear before rebuilding its display. A completed restart therefore cannot
+carry either stale image into the new round. The `(161,46)` frame-zero image is
+instead consistent with the initial left ship moving one pixel and then being
+stranded by a very early left hyperspace lifecycle. The exact creation event is
+still unobserved.
+
+The operator later clarified the run history: several earlier
+CPU-versus-CPU matches ended naturally, then new matches were launched until the
+anomaly appeared during ordinary live play. It did not appear at round end.
+Together with the full framebuffer clears, this separates the captured defect
+from those earlier matches and further deprioritizes the round-end shared-array
+hazard for this sighting.
+
 ## Ranked candidates
 
 | Rank | Candidate | Static confidence | Match to observations | Minimal next check |
 |---:|---|---|---|---|
-| 1 | Deferred ordinary-ship erasure lets a timer movement display hyperspace particles while the old sprite remains | High | Strengthened by the informal association with early hyperspace; insufficient alone for lasting duplicates | Observe visibility parity at counter activation, first particle tick, and the next inactive foreground erase |
-| 2 | Completion occurs while the ordinary visibility bit is still one, then overwrites the old render snapshot | High consequence; low confidence that normal scheduling reaches it | Would explain a stranded sprite while logic follows the restored real ship | Break only at the side-specific completion entry and inspect the visibility bit and previous-rendered state |
-| 3 | Round-end foreground animation races an active timer hyperspace effect in the shared 90-entry arrays | High | Strong code defect but weak report match without a round transition | Test only if a sighting correlates with death/score transition, or later as a separate bounded case |
-| 4 | Simultaneous CPU hyperspace leaves both old ordinary sprites visible for one foreground iteration | High | Could contribute to CPU-versus-CPU blip; does not explain the human-versus-right report if only right hyperspaced | Record both counters and visibility bits at entry |
-| 5 | Lead helper changes foreground/timer phasing and exposes an original timing window | Medium | Common to both edited builds and consistent with absence of an original sighting so far | Compare matched original and edited completion checks before attributing causality |
-| 6 | Lead patch directly corrupts hyperspace or render state | Low | Would fit edited-only sightings, but owned ranges and writes do not support it | No broad trace; revisit only if a patched completion differs with identical pre-state |
-| 7 | Planet renderer or collision interaction | Low | Both sightings had planet disabled and were away from its location | Keep planet disabled in the first matched control |
+| 1 | Completion occurs while the ordinary visibility bit is still one, then overwrites the old render snapshot | High consequence; occurrence not yet observed | The captured framebuffer proves two untracked left sprites while the current left draw is consistent | Break only at left completion and inspect visibility plus the old and replacement snapshots |
+| 2 | Deferred ordinary-ship erasure lets a timer movement display hyperspace particles while the old sprite remains | High | The frame-zero image one pixel from the initial left position fits a very early entry, but the short interval alone does not explain two lasting images | Observe left visibility parity at counter activation, first particle tick, and the next inactive foreground erase |
+| 3 | Round-end foreground animation races an active timer hyperspace effect in the shared 90-entry arrays | High | A real separate hazard, but the captured anomaly appeared during live play and not at round end | Defer to a separate controlled round-end-during-hyperspace case |
+| 4 | Round or frontend entry carries a stale image into the next screen | Low after transition re-check | Both entries clear the full CGA aperture before drawing new content | No runtime priority unless a controlled restart contradicts the clear path |
+| 5 | Simultaneous CPU hyperspace leaves both old ordinary sprites visible for one foreground iteration | High | The capture is CPU versus CPU, but only the right counter was active at the stop and the lasting images are left sprites | Record both counters and visibility bits at entry |
+| 6 | Lead helper changes foreground/timer phasing and exposes an original timing window | Medium | Timing exposure remains possible, but the captured build has gravity only rather than the lead patch | Compare matched original and gravity-edited lifecycle checks before attributing causality |
+| 7 | Prototype code directly corrupts hyperspace or render state | Low | The captured stale left sprites do not map to a known gravity-patch write | Revisit only if a patched lifecycle differs with identical pre-state |
+| 8 | Planet renderer or collision interaction | Low | The capture independently confirms planet disabled | Keep planet disabled in the next matched control |
 
 ## Narrow runtime handoff
 
@@ -263,16 +316,17 @@ side, whether the effect appeared, whether it persisted beyond the particle
 cycle, and whether a round transition occurred. Report numerator and denominator
 separately for each build.
 
-1. Rehearse the right-side lifecycle on an original-based run copy. At
-   `CS:07B6`, immediately after counter activation, record `DS:0061`, `0E2C`,
-   `0E4C`, `0CCC`, `0D6C`, and `0D8C`. The expected transient state is counter
+1. Rehearse the left-side lifecycle on an original-based run copy. At
+   `CS:0753`, immediately after counter activation, record `DS:0060`, `0E1C`,
+   `0E3C`, `0CBC`, `0D5C`, and `0D7C`. The expected transient state is counter
    one, dirty zero, entity zero, and visibility commonly still one.
-2. Establish whether the first right timer movement at `CS:267F` can occur
-   before the next foreground inactive-erase call at `CS:0162`. This is an
+2. Establish whether the first left timer movement at `CS:25B5` can occur
+   before the next foreground inactive-erase call at `CS:00EE`. This is an
    ordering observation, not a long instruction trace.
-3. In a separate minimally perturbed run, break only at right completion
-   `CS:2732`. The critical invariant is `DS:0CCC == 0` before completion replaces
-   the render snapshot. Repeat at left completion `CS:2630` only if needed.
+3. In a separate minimally perturbed run, break only at left completion
+   `CS:2630`. The critical invariant is `DS:0CBC == 0` before completion replaces
+   the render snapshot. The right-side invariant remains useful as a later
+   matched control, but the first captured stale images use left masks.
 4. Compare the same completion invariant on the exact lead-only and expanded
    gravity-aware builds. Record build hashes and options, but do not dump the
    full data segment unless a completion stop finds a nonzero visibility bit or

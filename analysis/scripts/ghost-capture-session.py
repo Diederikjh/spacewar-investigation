@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -248,6 +249,14 @@ def write_state(state: dict[str, object]) -> None:
     temporary.replace(STATE_FILE)
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def read_state() -> dict[str, object]:
     try:
         state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
@@ -259,6 +268,7 @@ def read_state() -> dict[str, object]:
     required = {
         "session_id": str,
         "source": str,
+        "source_sha256": str,
         "terminal_title": str,
         "dosbox_pid": int,
         "dosbox_window": int,
@@ -359,6 +369,7 @@ def launch(source: str) -> None:
         state = {
             "session_id": session_id,
             "source": source,
+            "source_sha256": sha256_file(PROJECT_DIR / source),
             "terminal_title": terminal_title,
             "dosbox_pid": pid,
             "dosbox_window": dosbox_window,
@@ -375,6 +386,7 @@ def launch(source: str) -> None:
     print("Capture session launched and validated.")
     print(f"session: {session_id}")
     print(f"source: {source}")
+    print(f"source SHA-256: {state['source_sha256']}")
 
 
 def input_action(state: dict[str, object], target: str, action: list[str]) -> None:
@@ -389,6 +401,7 @@ def print_status(state: dict[str, object]) -> None:
     print("Capture session is active and both window identities are valid.")
     print(f"session: {state['session_id']}")
     print(f"source: {state['source']}")
+    print(f"source SHA-256: {state['source_sha256']}")
 
 
 def remove_state_files() -> None:
